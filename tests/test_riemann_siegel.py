@@ -24,9 +24,8 @@ def test_theta_rejects_nonpositive_t():
 
 
 @pytest.mark.parametrize("p", [0.25, 0.75])
-def test_c0_removable_singularity_has_limit_one_half(p):
+def test_c0_limit_at_singularity(p):
     assert c0(p) == pytest.approx(0.5)
-    # and is continuous there
     assert c0(p + 1e-6) == pytest.approx(0.5, abs=1e-4)
     assert c0(p - 1e-6) == pytest.approx(0.5, abs=1e-4)
 
@@ -37,7 +36,7 @@ def test_c0_value_at_zero():
 
 
 @pytest.mark.parametrize("t_range", [(20, 100), (100, 1_000), (1_000, 5_000)])
-def test_riemann_siegel_error_decays_like_t_to_the_minus_three_quarters(t_range):
+def test_rs_error_bound(t_range):
     """After the C0 term, the error is about C1 * (2pi/t)^(3/4) with |C1| < ~0.03."""
     ts = np.linspace(*t_range, 150)
     err = np.array([abs(z_rs(t) - z_exact(t)) for t in ts])
