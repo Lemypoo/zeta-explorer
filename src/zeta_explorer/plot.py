@@ -1,4 +1,4 @@
-"""Static plots with matplotlib (install with `pip install zeta-explorer[plot]`)."""
+"""Matplotlib plots. Needs the `plot` extra."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ SURFACE = "#fcfcfb"
 
 
 def plot_z(t_min: float = 0.0, t_max: float = 60.0, samples: int = 1500) -> Figure:
-    """Z(t) along the critical line with every zero in range marked."""
+    """Z(t) with its zeros marked."""
     import matplotlib.pyplot as plt
 
     ts = np.linspace(t_min, t_max, samples)
