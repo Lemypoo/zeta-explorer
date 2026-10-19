@@ -27,3 +27,13 @@ Design notes:
 
 Next: higher Riemann-Siegel corrections C1 to C4, then mark
 Gram points on the Z plot.
+
+## 2026-10-18 (later): cleanup pass
+
+Cut the module docstrings in `riemann_siegel.py` and `zeros.py` down to a line or
+two, since the README already walks through the math, and dropped comments that
+only restated the next line. The comments left in the Illinois loop and the Gram
+point Newton step explain why those tricks work. Shortened two test names.
+
+Also fixed a README mistake: Z at t = 10⁶ needs 398 terms, not 399
+(floor(sqrt(10⁶/2π)) = floor(398.94)). No behavior changes, same 32 tests.
