@@ -15,8 +15,7 @@ def test_plot_z_marks_every_zero(tmp_path):
 
 def test_plot_gram_flags_g126_and_g134():
     fig = plot_gram(262, 300, samples=200)
-    bad = fig.axes[0].lines[2]
-    assert bad.get_label() == "bad Gram point"
+    (bad,) = [line for line in fig.axes[0].lines if line.get_label() == "bad Gram point"]
     assert len(bad.get_xdata()) == 2
 
 
