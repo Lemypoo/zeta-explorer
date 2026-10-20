@@ -31,6 +31,12 @@ def test_signs_match_mpmath():
     assert np.array_equal(good_gram(z_values(g)), good_gram(exact))
 
 
+def test_good_gram_offset():
+    z = np.array([1.0, 1.0, -1.0])
+    assert good_gram(z).tolist() == [True, False, False]
+    assert good_gram(z, n0=1).tolist() == [False, True, True]
+
+
 def test_gram_blocks():
     good = np.array([True, True, False, True, False, False, True, True])
     assert gram_blocks(good) == [(0, 1), (1, 3), (3, 6), (6, 7)]

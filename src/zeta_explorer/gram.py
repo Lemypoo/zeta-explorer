@@ -35,9 +35,9 @@ def z_values(ts: ArrayLike) -> np.ndarray:
     return z
 
 
-def good_gram(z_at_gram: np.ndarray) -> np.ndarray:
-    """Gram's law at each point: (-1)^n Z(g_n) > 0, with n the array index."""
-    sign = np.where(np.arange(len(z_at_gram)) % 2 == 0, 1.0, -1.0)
+def good_gram(z_at_gram: np.ndarray, n0: int = 0) -> np.ndarray:
+    """Gram's law at each point: (-1)^n Z(g_n) > 0, where z_at_gram[i] = Z(g_(n0 + i))."""
+    sign = np.where((n0 + np.arange(len(z_at_gram))) % 2 == 0, 1.0, -1.0)
     return sign * z_at_gram > 0
 
 
