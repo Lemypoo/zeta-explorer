@@ -6,6 +6,7 @@ sign changes of Z. See the README for the formulas.
 
 from __future__ import annotations
 
+import functools
 import math
 
 import mpmath
@@ -47,17 +48,22 @@ def theta_prime(t: ArrayLike) -> float | np.ndarray:
     return float(out) if out.ndim == 0 else out
 
 
-def z_rs(t: ArrayLike) -> float | np.ndarray:
-    """Riemann-Siegel main sum plus the C0 term. Error ~ 0.03 (2pi/t)^(3/4).
+def z_rs(t: ArrayLike, corrections: int = 4) -> float | np.ndarray:
+    """Riemann-Siegel Z: the main sum plus the remainder terms C0..C_k, k = `corrections`.
 
-    Accepts a scalar or an array of t.
+    Accepts a scalar or an array of t. With k corrections the error is
+    O(t^(-(2k+3)/4)); see the README for measured constants.
     """
+    coeffs = rs_coefficients()
+    if not 0 <= corrections < len(coeffs):
+        raise ValueError(f"corrections must be in 0..{len(coeffs) - 1}")
     ts = np.atleast_1d(np.asarray(t, dtype=float))
     a = np.sqrt(ts / TWO_PI)
     N = a.astype(np.int64)
-    p = a - N
+    z = a - N - 0.5
+    remainder = sum(np.polyval(coeffs[k], z) / a**k for k in range(corrections + 1))
     sign = np.where(N % 2 == 1, 1.0, -1.0)  # (-1)^(N-1)
-    out = _main_sum(ts, N) + sign / np.sqrt(a) * c0(p)
+    out = _main_sum(ts, N) + sign / np.sqrt(a) * remainder
     return float(out[0]) if np.ndim(t) == 0 else out
 
 
@@ -79,16 +85,59 @@ def _main_sum(t: np.ndarray, N: np.ndarray) -> np.ndarray:
     return out
 
 
-def c0(p: ArrayLike) -> float | np.ndarray:
-    p = np.asarray(p, dtype=float)
-    num = np.cos(TWO_PI * (p * p - p - 1 / 16))
-    den = np.cos(TWO_PI * p)
-    near = np.abs(den) < 1e-8
-    # 0/0 at p = 1/4 and 3/4. L'Hopital gives 1/2 at both.
-    with np.errstate(divide="ignore", invalid="ignore"):
-        lhopital = np.sin(TWO_PI * (p * p - p - 1 / 16)) * (2 * p - 1) / np.sin(TWO_PI * p)
-    out = np.where(near, lhopital, num / np.where(near, 1.0, den))
-    return float(out) if out.ndim == 0 else out
+# C_k = sum of num/den * Psi^(m)(p) / pi^j over the (num, den, m, j) below, where
+# Psi(p) = cos(2pi(p^2 - p - 1/16)) / cos(2pi p). These are the classical C0..C4
+# (Edwards, Riemann's Zeta Function, ch. 7). The tests confirm each one by the
+# order of the error it removes.
+_C_TERMS = (
+    ((1, 1, 0, 0),),
+    ((-1, 96, 3, 2),),
+    ((1, 64, 2, 2), (1, 18432, 6, 4)),
+    ((-1, 64, 1, 2), (-1, 3840, 5, 4), (-1, 5308416, 9, 6)),
+    ((1, 128, 0, 2), (19, 24576, 4, 4), (11, 5898240, 8, 6), (1, 2038431744, 12, 8)),
+)
+_DEGREE = 90
+
+
+@functools.cache
+def rs_coefficients() -> tuple[np.ndarray, ...]:
+    """Taylor coefficients of C0..C4 in z = p - 1/2, highest power first (for np.polyval).
+
+    Psi is entire (its poles at p = 1/4, 3/4 cancel), so a Taylor series about
+    p = 1/2 converges on all of [0, 1] and the removable singularities need no
+    special case. Shifting to z:
+
+        Psi(1/2 + z) = -cos(2pi z^2 - 5pi/8) / cos(2pi z)
+
+    Dividing the two series is unstable in floats (1/cos has poles at |z| = 1/4,
+    so rounding errors grow like 4^j), hence the high working precision.
+    """
+    mp = mpmath.mp
+    with mpmath.workdps(110):
+        two_pi = 2 * mp.pi
+        c, s = mp.cos(5 * mp.pi / 8), mp.sin(5 * mp.pi / 8)
+        num = [mp.mpf(0)] * _DEGREE
+        den = [mp.mpf(0)] * _DEGREE
+        for k in range(0, _DEGREE, 4):  # cos(2pi z^2 - 5pi/8), in powers of z^2
+            num[k] = c * (-1) ** (k // 4) * two_pi ** (k // 2) / mp.factorial(k // 2)
+        for k in range(2, _DEGREE, 4):
+            num[k] = s * (-1) ** (k // 4) * two_pi ** (k // 2) / mp.factorial(k // 2)
+        for k in range(0, _DEGREE, 2):
+            den[k] = -((-1) ** (k // 2)) * two_pi**k / mp.factorial(k)
+        psi = []
+        for j in range(_DEGREE):
+            psi.append((num[j] - sum(den[i] * psi[j - i] for i in range(1, j + 1))) / den[0])
+
+        out = []
+        for terms in _C_TERMS:
+            ck = [mp.mpf(0)] * _DEGREE
+            for numer, denom, m, j in terms:
+                scale = mp.mpf(numer) / denom / mp.pi**j
+                for i in range(_DEGREE - m):
+                    # i-th coefficient of the m-th derivative
+                    ck[i] += scale * psi[i + m] * mp.factorial(i + m) / mp.factorial(i)
+            out.append(np.array([float(x) for x in reversed(ck)]))
+    return tuple(out)
 
 
 def z_exact(t: float) -> float:

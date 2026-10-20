@@ -26,7 +26,7 @@ def test_riemann_siegel_approximation_finds_the_same_zeros():
     exact = find_zeros(10, 100)
     approx = find_zeros(10, 100, z=z_rs)
     assert len(approx) == len(exact)
-    assert max(abs(a - b) for a, b in zip(approx, exact, strict=True)) < 0.01
+    assert max(abs(a - b) for a, b in zip(approx, exact, strict=True)) < 1e-5
 
 
 def test_illinois_on_a_simple_function():
