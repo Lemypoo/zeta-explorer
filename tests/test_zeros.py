@@ -1,10 +1,11 @@
 import math
 
 import mpmath
+import numpy as np
 import pytest
 
 from zeta_explorer.riemann_siegel import theta, z_rs
-from zeta_explorer.zeros import find_zeros, gram_point, illinois
+from zeta_explorer.zeros import find_zeros, gram_point, gram_points, illinois
 
 FIRST_THREE = [14.134725141734693, 21.022039638771555, 25.010857580145688]
 
@@ -54,3 +55,10 @@ def test_gram_point_solves_theta_equals_n_pi(n):
 def test_gram_point_rejects_negative_index():
     with pytest.raises(ValueError):
         gram_point(-1)
+
+
+def test_gram_points_batch():
+    ns = np.arange(5_000)
+    g = gram_points(ns)
+    assert np.all(np.diff(g) > 0)
+    assert theta(g) == pytest.approx(ns * math.pi, abs=1e-8)

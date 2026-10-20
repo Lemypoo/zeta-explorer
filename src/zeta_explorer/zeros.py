@@ -6,6 +6,7 @@ import math
 from collections.abc import Callable
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 from zeta_explorer.riemann_siegel import theta, theta_prime, z_exact
 
@@ -54,17 +55,23 @@ def find_zeros(
 
 def gram_point(n: int, tol: float = 1e-12) -> float:
     """g_n, the solution of theta(g_n) = n pi (n >= 0, so g_0 ~ 17.85)."""
-    if n < 0:
-        raise ValueError("gram_point needs n >= 0")
-    target = n * math.pi
+    return float(gram_points([n], tol)[0])
+
+
+def gram_points(ns: ArrayLike, tol: float = 1e-12) -> np.ndarray:
+    """Vectorized gram_point."""
+    ns = np.asarray(ns)
+    if np.any(ns < 0):
+        raise ValueError("Gram points need n >= 0")
+    target = ns * math.pi
     # theta is increasing and convex out here, so Newton started to the right
     # of the root walks down onto it without overshooting.
-    t = 20.0
-    while theta(t) < target:
-        t *= 2
+    t = np.full(ns.shape, 20.0)
+    while np.any(low := theta(t) < target):
+        t[low] *= 2
     for _ in range(100):
         dt = (theta(t) - target) / theta_prime(t)
         t -= dt
-        if abs(dt) < tol * t:
+        if np.all(np.abs(dt) < tol * t):
             return t
-    raise RuntimeError(f"Newton didn't converge for n={n}")
+    raise RuntimeError("Newton didn't converge for some Gram points")

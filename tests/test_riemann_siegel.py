@@ -46,3 +46,8 @@ def test_rs_error_bound(t_range):
 def test_z_is_real_rotation_of_zeta():
     t = 37.0
     assert abs(zeta_critical(t)) == pytest.approx(abs(z_exact(t)), rel=1e-10)
+
+
+def test_z_rs_vectorized_matches_scalar():
+    ts = np.array([20.0, 150.5, 999.0, 12_345.6])
+    assert z_rs(ts) == pytest.approx([z_rs(t) for t in ts], abs=1e-12)
