@@ -1,6 +1,6 @@
 # zeta-explorer
 
-[![tests](https://github.com/Lemypoo/zeta-explorer/actions/workflows/tests.yml/badge.svg)](https://github.com/Lemypoo/zeta-explorer/actions/workflows/tests.yml)
+[![tests](https://github.com/louisbelot/zeta-explorer/actions/workflows/tests.yml/badge.svg)](https://github.com/louisbelot/zeta-explorer/actions/workflows/tests.yml)
 
 ![Z(t) on the critical line with its first 13 zeros](docs/z_function.png)
 
@@ -18,7 +18,7 @@ and a browser version come next.
 ## Install
 
 ```bash
-pip install "zeta-explorer[plot] @ git+https://github.com/Lemypoo/zeta-explorer"
+pip install "zeta-explorer[plot] @ git+https://github.com/louisbelot/zeta-explorer"
 ```
 
 ## Quick start
