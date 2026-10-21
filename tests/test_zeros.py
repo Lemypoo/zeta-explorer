@@ -17,7 +17,7 @@ def test_first_zeros_known_values():
 
 def test_29_zeros_below_100_match_mpmath():
     zeros = find_zeros(10, 100)
-    assert len(zeros) == 29  # N(100) = 29
+    assert len(zeros) == 29
     reference = [float(mpmath.zetazero(k).imag) for k in range(1, 30)]
     assert zeros == pytest.approx(reference, abs=1e-9)
 

@@ -1,5 +1,3 @@
-"""Matplotlib plots. Needs the `plot` extra."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -23,12 +21,11 @@ SURFACE = "#fcfcfb"
 
 
 def plot_z(t_min: float = 0.0, t_max: float = 60.0, samples: int = 1500) -> Figure:
-    """Z(t) with its zeros marked."""
     import matplotlib.pyplot as plt
 
     ts = np.linspace(t_min, t_max, samples)
     zs = [z_exact(t) for t in ts]
-    zeros = find_zeros(max(t_min, 10.0), t_max)  # Z has no zeros below t = 14.13
+    zeros = find_zeros(max(t_min, 10.0), t_max)
 
     fig, ax = plt.subplots(figsize=(10, 4), facecolor=SURFACE)
     ax.set_facecolor(SURFACE)
@@ -51,7 +48,6 @@ def plot_z(t_min: float = 0.0, t_max: float = 60.0, samples: int = 1500) -> Figu
 
 
 def plot_gram(t_min: float = 262.0, t_max: float = 300.0, samples: int = 1500) -> Figure:
-    """Z(t) with Gram points, the ones that break Gram's law highlighted."""
     import matplotlib.pyplot as plt
 
     ts = np.linspace(t_min, t_max, samples)
@@ -85,10 +81,6 @@ def plot_gram(t_min: float = 262.0, t_max: float = 300.0, samples: int = 1500) -
 
 
 def plot_rs_error(t_min: float = 200.0, t_max: float = 20_000.0, bins: int = 40) -> Figure:
-    """Riemann-Siegel error against mpmath for 0..4 correction terms, log-log.
-
-    Each point is the largest error over one log-spaced bin of 25 samples.
-    """
     import matplotlib.pyplot as plt
 
     edges = np.geomspace(t_min, t_max, bins + 1)

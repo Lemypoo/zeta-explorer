@@ -41,12 +41,10 @@ def test_c0_series_matches_closed_form(p):
 
 @pytest.mark.parametrize("p", [0.25, 0.75])
 def test_c0_series_through_removable_singularity(p):
-    # cos(2pi p) = 0 here; L'Hopital gives 1/2
     assert np.polyval(rs_coefficients()[0], p - 0.5) == pytest.approx(0.5, abs=1e-15)
 
 
 def c_reference(k, p):
-    """C_k from mpmath's numerical derivatives of Psi, built independently of the series."""
     d = list(mpmath.diffs(psi, p, 12))
     pi2 = mpmath.pi**2
     c = [
@@ -70,8 +68,6 @@ def test_higher_corrections_match_derivatives(k, p):
     assert np.polyval(rs_coefficients()[k], p - 0.5) == pytest.approx(expected, abs=1e-15)
 
 
-# Max of |z_rs - Z| * t^((2k+3)/4) measured over [200, 2000] is
-# 0.119, 0.052, 0.0090, 0.029, 0.015 for k = 0..4. Bounds leave ~15% headroom.
 @pytest.fixture(scope="module")
 def z_reference():
     ts = np.linspace(200, 2_000, 300)

@@ -32,7 +32,6 @@ def test_loggamma_matches_mpmath(z):
 
 @pytest.mark.parametrize("t", [0.5, 2.0, 6.0, 30.0])
 def test_theta_from_loggamma(t):
-    # theta(t) = Im log Gamma(1/4 + it/2) - (t/2) log pi, exact for every t
     th = loggamma(0.25 + 0.5j * t).imag - t / 2 * math.log(math.pi)
     assert th == pytest.approx(float(mpmath.siegeltheta(t)), abs=1e-12)
 
@@ -58,7 +57,6 @@ def test_zeta_known_values(s, expected):
 
 @pytest.mark.parametrize("k", range(1, 12))
 def test_zeta_negative_odd_integers(k):
-    # zeta(1 - 2k) = -B_2k / 2k
     expected = -float(bernoulli(2 * k)) / (2 * k)
     value = zeta(1 - 2 * k)
     assert value.imag == 0
@@ -76,7 +74,6 @@ def test_zeta_matches_mpmath_on_random_points():
 
 @pytest.mark.parametrize("t", [1_000.0, 10_000.0])
 def test_zeta_high_on_critical_line(t):
-    # float phases t log n lose ~1e-11 absolute out here
     assert abs(zeta(0.5 + 1j * t) - complex(mpmath.zeta(0.5 + 1j * t))) < 1e-10
 
 
@@ -98,14 +95,14 @@ def test_backlund_bound_holds(s, N, M):
     value, bound = euler_maclaurin(s, N, M)
     err = abs(value - complex(mpmath.zeta(s)))
     assert err <= bound
-    assert bound < 50 * err  # and it's not uselessly loose
+    assert bound < 50 * err
 
 
 def test_euler_maclaurin_validates_arguments():
     with pytest.raises(ValueError):
         euler_maclaurin(2, 0, 3)
     with pytest.raises(ValueError):
-        euler_maclaurin(-10, 5, 3)  # Re s <= -(2M + 1)
+        euler_maclaurin(-10, 5, 3)
 
 
 @pytest.mark.parametrize("s", [0.3 + 5j, 0.5 + 50j, 0.9 - 7j, 0.01 + 0.2j])
@@ -115,8 +112,6 @@ def test_functional_equation(s):
 
 @pytest.mark.parametrize("t", [10.0, 100.0, 5_000.0])
 def test_chi_on_critical_line_is_theta_phase(t):
-    # chi(1/2 + it) = exp(-2i theta(t)). The phase is ~t log t radians, so
-    # doubles only pin it down to a few ulps of that.
     assert chi(0.5 + 1j * t) == pytest.approx(cmath.exp(-2j * theta(t)), abs=1e-11)
 
 

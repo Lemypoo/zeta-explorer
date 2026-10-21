@@ -1,10 +1,3 @@
-"""Gram's law, Gram blocks and Rosser's rule.
-
-g_n is good when (-1)^n Z(g_n) > 0, which is what Z would look like if exactly
-one zero sat in each Gram interval. A Gram block is a run [g_j, g_k) between
-consecutive good Gram points; Rosser's rule says it holds at least k - j zeros.
-"""
-
 from __future__ import annotations
 
 from collections import Counter
@@ -16,14 +9,11 @@ from numpy.typing import ArrayLike
 from zeta_explorer.riemann_siegel import z_exact, z_rs
 from zeta_explorer.zeros import gram_points
 
-# z_rs with C0..C4 is tested to 1e-8 at t = 200 and gets better from there, so
-# only signs of values smaller than SIGN_GUARD are worth a second opinion.
 RS_FROM = 200.0
 SIGN_GUARD = 1e-6
 
 
 def z_values(ts: ArrayLike) -> np.ndarray:
-    """Z at many points, accurate enough that the signs can be trusted."""
     ts = np.asarray(ts, dtype=float)
     z = np.empty_like(ts)
     low = ts < RS_FROM
@@ -36,23 +26,16 @@ def z_values(ts: ArrayLike) -> np.ndarray:
 
 
 def good_gram(z_at_gram: np.ndarray, n0: int = 0) -> np.ndarray:
-    """Gram's law at each point: (-1)^n Z(g_n) > 0, where z_at_gram[i] = Z(g_(n0 + i))."""
     sign = np.where((n0 + np.arange(len(z_at_gram))) % 2 == 0, 1.0, -1.0)
     return sign * z_at_gram > 0
 
 
 def gram_blocks(good: np.ndarray) -> list[tuple[int, int]]:
-    """(j, k) for every Gram block [g_j, g_k) between consecutive good points."""
     idx = np.flatnonzero(good)
     return list(zip(idx[:-1].tolist(), idx[1:].tolist(), strict=True))
 
 
 def sign_changes(a: float, b: float, za: float, zb: float, need: int, max_level: int = 8) -> int:
-    """Sign changes of Z on [a, b], sampled more finely until `need` show up.
-
-    Returns the count at the finest level tried, which is a lower bound on the
-    number of zeros in (a, b).
-    """
     pieces = max(need, 1)
     for _ in range(max_level):
         pieces *= 2
@@ -79,7 +62,6 @@ class GramStats:
 
 
 def gram_stats(n_max: int) -> GramStats:
-    """Gram's law and Rosser's rule over g_0 .. g_n_max."""
     g = gram_points(np.arange(n_max + 1))
     z = z_values(g)
     good = good_gram(z)

@@ -12,12 +12,10 @@ def stats():
 
 
 def test_first_bad_gram_point_is_126(stats):
-    # Hutchinson (1925): Gram's law first fails at g_126 ~ 282.45
     assert stats.first_bad == 126
 
 
 def test_no_rosser_violations_early(stats):
-    # The first failure of Rosser's rule is near g_13999525 (Brent 1979)
     assert stats.rosser_violations == []
 
 
