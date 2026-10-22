@@ -1,6 +1,17 @@
 import matplotlib
+import numpy as np
 
-from zeta_explorer.plot import plot_gram, plot_rs_error, plot_z
+from zeta_explorer.plot import (
+    phase_colors,
+    plot_continuation,
+    plot_domain,
+    plot_gram,
+    plot_rs_error,
+    plot_spacing,
+    plot_spiral,
+    plot_z,
+)
+from zeta_explorer.spacing import zeros_between
 
 matplotlib.use("Agg")
 
@@ -22,3 +33,35 @@ def test_plot_gram_flags_g126_and_g134():
 def test_plot_rs_error_draws_one_line_per_order():
     fig = plot_rs_error(200, 400, bins=2)
     assert len(fig.axes[0].lines) == 5
+
+
+def test_phase_colors_hue_and_bands():
+    rgb = phase_colors(np.array([1.0, 1j, -1.0, 2.0, 0.0, np.inf]))
+    assert rgb.shape == (6, 3)
+    assert rgb[0].argmax() == 0
+    assert rgb[2].argmax() != 0
+    assert np.allclose(rgb[3], rgb[0])
+    assert np.isfinite(rgb).all()
+
+
+def test_plot_domain_image_size():
+    fig = plot_domain(0, 10, -1, 2, width=100)
+    assert fig.axes[0].images[0].get_array().shape == (30, 100, 3)
+
+
+def test_plot_spiral_counts_zeros():
+    fig = plot_spiral(t_max=26, samples=300)
+    assert any("3 times" in text.get_text() for text in fig.axes[0].texts)
+
+
+def test_plot_continuation_draws_three_series_twice():
+    fig = plot_continuation(N=50)
+    left, right = fig.axes
+    assert len(right.lines) == 3
+    assert len(left.lines) == 4
+
+
+def test_plot_spacing():
+    fig = plot_spacing(zeros_between(1000, 1400), bins=20)
+    assert len(fig.axes) == 2
+    assert "399 zero spacings" in fig.axes[0].get_legend().get_texts()[0].get_text()
