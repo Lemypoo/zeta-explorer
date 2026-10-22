@@ -94,3 +94,66 @@ Design notes:
 Next: functional equation demos (they now just need a plot since
 chi exists), then domain coloring of the strip with a vectorized zeta, then
 spacing statistics vs GUE.
+
+## 2026-10-22: zeta on arrays, phase portrait, continuation, zero spacings vs GUE
+
+Built:
+
+- `zeta.py`: `zeta`, `chi` and `loggamma` take arrays of any shape. Each point
+  keeps its own N, the Dirichlet head is a chunked masked matrix, and the
+  Euler-Maclaurin loop shrinks its index set as points meet their Backlund
+  bound. Scalar calls go through the same code. Added `xi(s)`.
+- `continuation.py`: partial sums of the Dirichlet series, the alternating eta
+  series and the Euler-Maclaurin corrected sum.
+- `zeros.py`: `illinois_many`, a vectorized Illinois method that retires each
+  bracket once it converges (relative tolerance, since an absolute 1e-10 is
+  below one ulp of t past 10⁶).
+- `spacing.py`: `zeros_between(n_lo, n_hi)` brackets every zero between two good
+  Gram points (refining Gram blocks until Rosser's count is met) and refines all
+  brackets together; unfolding with θ/π; the GUE gap probability as a Fredholm
+  determinant with Gauss-Legendre (Bornemann's method); the spacing density and
+  CDF from a Chebyshev interpolant of E(s); Wigner surmise; Montgomery's pair
+  correlation; an empirical pair correlation with no edge bias; KS distance.
+- Plots: phase portrait of the strip, the spiral of ζ(1/2 + it), the three
+  partial sums, and the spacing histogram with pair correlation. All four
+  rendered and checked by eye; moved two legends and a label off the data.
+
+Checks:
+
+- Array zeta vs mpmath on 2,000 random points (|σ| ≤ 30, |t| ≤ 200): max
+  relative error 2.9e-13. Array vs scalar calls agree to 1e-15 relative.
+- ξ against mpmath to 1e-12, ξ(0) = ξ(1) = 1/2, ξ(2) = π/6, symmetry, real on
+  the line.
+- E(s) matches 1 − s + π²s⁴/36 − π⁴s⁶/675 for small s; 20 and 60 nodes agree to
+  1e-12. p(s) agrees with 30-digit mpmath derivatives to about 3e-10, integrates
+  to 1 with mean 1, variance 0.17999.
+- 300 random 120×120 GUE matrices: KS distance to the sine-kernel CDF 0.0044,
+  to Poisson 0.28.
+- zeros_between(1000, 1060) gives zeros 1002 to 1061, matching `zetazero` to
+  1e-8. Near n = 10⁷ it finds exactly 100,000 zeros between g_n and g_(n+100000)
+  in 18 s.
+- Spacings of 100,000 zeros at n = 10⁵, 10⁶, 10⁷: variance 0.1636, 0.1668,
+  0.1693; KS distance to GUE 0.0174, 0.0138, 0.0110.
+- Phase portrait grid (594,000 points): 1.05 s vectorized, 6.5 s for a loop over
+  the old scalar zeta.
+
+Design notes:
+
+- The price of one code path: a single scalar zeta call went from about 11 µs to
+  about 200 µs, mostly numpy overhead in the Euler-Maclaurin loop. Nothing hot
+  calls zeta one point at a time, so I kept one implementation.
+- E''(s) by Chebyshev differentiation loses about 6 digits near s = 0 (the
+  derivative of a degree-80 series amplifies errors by deg² per order), which
+  still leaves p(s) good to 1e-9. The CDF is clamped to 1 and the density to 0
+  past s = 6, where E(6) ≈ 2e-20.
+- The first draft used an absolute tolerance in the vectorized root finder and
+  none of the brackets converged at t = 6·10⁵. Switched to relative.
+- The zeros are more regular than GUE at these heights. The variance and KS
+  numbers move toward GUE with height, matching the finite-height picture of
+  Bogomolny and Keating (effective matrix size log(t/2π)/√(12Λ), about 3 at
+  t = 5·10⁶). The dip in the pair correlation at 0.3 < u < 0.9 is about −0.013 at
+  all three heights, so this range is too short to see it move.
+
+Next: an animation sweeping σ across the strip, then the explicit formula
+rebuilding π(x) from the zeros, then Lehmer pairs (the closest zeros found by
+zeros_between are a natural place to start).
