@@ -61,3 +61,34 @@ def gram_points(ns: ArrayLike, tol: float = 1e-12) -> np.ndarray:
         if np.all(np.abs(dt) < tol * t):
             return t
     raise RuntimeError("Newton didn't converge for some Gram points")
+
+
+def illinois_many(
+    f: Callable[[np.ndarray], np.ndarray],
+    a: np.ndarray,
+    b: np.ndarray,
+    fa: np.ndarray,
+    fb: np.ndarray,
+    rtol: float = 1e-12,
+    max_iter: int = 100,
+) -> np.ndarray:
+    a, b, fa, fb = (np.array(x, dtype=float) for x in (a, b, fa, fb))
+    if np.any(fa * fb > 0):
+        raise ValueError("some roots are not bracketed")
+    root = np.where(fa == 0, a, b)
+    idx = np.flatnonzero((fa != 0) & (fb != 0))
+    a, b, fa, fb = a[idx], b[idx], fa[idx], fb[idx]
+    for _ in range(max_iter):
+        if len(idx) == 0:
+            return root
+        c = b - fb * (b - a) / (fb - fa)
+        fc = f(c)
+        flip = fc * fb < 0
+        a = np.where(flip, b, a)
+        fa = np.where(flip, fb, fa / 2)
+        b, fb = c, fc
+        done = (fc == 0) | (np.abs(b - a) < rtol * np.abs(b))
+        root[idx[done]] = b[done]
+        live = ~done
+        idx, a, b, fa, fb = idx[live], a[live], b[live], fa[live], fb[live]
+    raise RuntimeError(f"{len(idx)} roots did not converge")

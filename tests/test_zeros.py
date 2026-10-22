@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from zeta_explorer.riemann_siegel import theta, z_rs
-from zeta_explorer.zeros import find_zeros, gram_point, gram_points, illinois
+from zeta_explorer.zeros import find_zeros, gram_point, gram_points, illinois, illinois_many
 
 FIRST_THREE = [14.134725141734693, 21.022039638771555, 25.010857580145688]
 
@@ -62,3 +62,18 @@ def test_gram_points_batch():
     g = gram_points(ns)
     assert np.all(np.diff(g) > 0)
     assert theta(g) == pytest.approx(ns * math.pi, abs=1e-8)
+
+
+def test_illinois_many_solves_each_bracket():
+    a = np.array([1.0, 4.0, 7.0, 10.0])
+    b = a + 1
+    roots = illinois_many(np.cos, a, b, np.cos(a), np.cos(b))
+    assert roots == pytest.approx(np.pi * (np.arange(4) + 0.5), rel=1e-12)
+
+
+def test_illinois_many_endpoint_roots_and_unbracketed():
+    roots = illinois_many(np.sin, np.array([0.0, 3.0]), np.array([1.0, 4.0]),
+                          np.array([0.0, np.sin(3.0)]), np.array([np.sin(1.0), np.sin(4.0)]))
+    assert roots == pytest.approx([0.0, math.pi], abs=1e-12)
+    with pytest.raises(ValueError):
+        illinois_many(np.sin, np.array([1.0]), np.array([2.0]), np.array([0.8]), np.array([0.9]))
