@@ -2,7 +2,7 @@
 
 [![tests](https://github.com/louisbelot/zeta-explorer/actions/workflows/tests.yml/badge.svg)](https://github.com/louisbelot/zeta-explorer/actions/workflows/tests.yml)
 
-![Z(t) on the critical line with its first 13 zeros](docs/z_function.png)
+![Phase portrait of zeta over the critical strip](docs/domain.png)
 
 The Riemann Hypothesis says every non-trivial zero of ζ(s) sits on the line
 Re(s) = 1/2. On that line ζ is complex, but multiply it by the phase e^(iθ(t)) and
@@ -10,10 +10,11 @@ you get the real-valued Riemann-Siegel Z function, which changes sign at every z
 This repo computes θ, Z, ζ(s) itself, the zeros and the Gram points straight from
 the formulas, checks the results against mpmath, and uses Turing's method to prove
 the zero count is complete: all 138,069 zeros of ζ with 0 < Im s ≤ 100000 are on
-the critical line and simple.
+the critical line and simple. It also draws ζ over the complex plane, and it
+compares 100,000 zeros near t = 5·10⁶ with the eigenvalue statistics of large
+random Hermitian matrices.
 
-Domain coloring of the critical strip, statistics of the zero spacings, animations
-and a browser version come next.
+Animations, the explicit formula for π(x) and a browser version come next.
 
 ## Install
 
@@ -41,8 +42,16 @@ from zeta_explorer.turing import verify_zeros
 verify_zeros(10_000)
 # Verification(n=10143, g_n=10000.881777216977, zeros=10144, blocks_after=2)
 
-from zeta_explorer.plot import plot_z, plot_gram, plot_rs_error
+import numpy as np
+zeta(np.array([-3, 0.5 + 14.134725141734693j]))   # vectorized: [1/120, ~1e-16]
+
+from zeta_explorer.spacing import zeros_between, normalized_spacings
+z = zeros_between(10**6, 10**6 + 5)   # zeros between Gram points g_1000000 and g_1000005
+# [600270.74787059, 600271.48637367, 600271.76148043, 600272.00103217, 600273.02653325]
+
+from zeta_explorer.plot import plot_z, plot_domain, plot_spiral, plot_spacing
 plot_z(0, 60).savefig("z.png")
+plot_domain().savefig("domain.png")
 ```
 
 ## The math
@@ -134,7 +143,50 @@ error is 1.4e-11 (the same phase floor as above). The tests also check
 error and is within 50x of it, that χ(1/2 + it) = e^(−2iθ(t)), and that
 e^(iθ)ζ(1/2 + it) is real and equals the Riemann-Siegel Z.
 
+### Phase portrait
+
+The picture at the top is `plot_domain()`: ζ(σ + it) for −5 ≤ σ ≤ 6 and
+0 ≤ t ≤ 60, about 600,000 points. Hue is the argument of ζ, and the brightness
+ramps up and resets every time |ζ| doubles, so the shading edges are level curves
+of |ζ| (Wegert's enhanced phase portrait). A zero is a point where every color
+meets, going around once counterclockwise; the pole at s = 1 goes the other way.
+All the zeros in the strip sit on the dashed line σ = 1/2, the trivial zeros at
+−2 and −4 sit on the left edge, and to the right of σ = 2 the picture is almost
+flat red because ζ(s) is close to 1 there.
+
+This needed ζ on arrays. `zeta`, `chi` and `loggamma` now take any array shape:
+every point keeps its own N = 10 + ⌊|t|/π⌋, the main sums are one masked
+(points × n) matrix built in chunks, and the Euler-Maclaurin tail drops each point
+out of the loop as soon as its Backlund bound is small enough. The whole grid
+takes 1.05 s, against 6.5 s for a Python loop over the old scalar version.
+
+### Analytic continuation
+
+![Partial sums of three series for zeta at the first zero](docs/continuation.png)
+
+Σ n^(−s) only converges for σ > 1, and at the first zero s = 1/2 + 14.1347i the
+partial sums spiral outward like N^(1/2)/|s − 1|. Two cheap fixes both land on
+ζ(s) = 0. The alternating series η(s) = Σ (−1)^(n−1) n^(−s) converges for σ > 0,
+and ζ = η/(1 − 2^(1−s)), but its error only falls like N^(−1/2). Adding the
+first two Euler-Maclaurin terms N^(1−s)/(s−1) + N^(−s)/2 to the raw partial sum
+gives an error of order |s|·N^(−σ−1), N^(−3/2) on the critical line, and it works
+anywhere with σ > −1. The tests check both rates.
+
+The functional equation is easiest to see through
+ξ(s) = ½s(s − 1)π^(−s/2)Γ(s/2)ζ(s), which cancels the pole and the trivial zeros.
+`xi(s)` evaluates it from the right half plane and reflects with ξ(s) = ξ(1 − s);
+the tests check it against mpmath, check ξ(0) = ξ(1) = 1/2 and ξ(2) = π/6, and
+check that it is real on the critical line.
+
+![zeta(1/2 + it) traced in the complex plane for t up to 40](docs/spiral.png)
+
+On the critical line itself, ζ(1/2 + it) traces loops that pass through the
+origin once per zero. It starts at ζ(1/2) = −1.4604, and between t = 0 and 40 it
+goes through 0 six times.
+
 ### Zeros
+
+![Z(t) on the critical line with its first 13 zeros](docs/z_function.png)
 
 Sign changes of Z on a grid, refined with the Illinois method
 (regula falsi that halves a stuck endpoint's weight). All 29 zeros below t = 100
@@ -186,6 +238,56 @@ meet, so every zero up to g_n is a sign change, which means it is on the line an
 simple. For T = 100,000 it runs in 9 seconds, needs K = 2 blocks, and stops at
 g_138068 ≈ 100000.29 with N = 138,069 (mpmath's `nzeros` agrees). The tests
 cross-check smaller heights the same way.
+
+### Zero spacings and random matrices
+
+![Spacing histogram and pair correlation of 100,000 zeros near t = 5 million](docs/spacing.png)
+
+Montgomery conjectured in 1973 that the pair correlation of the zeros, measured in
+units of the mean spacing, is 1 − (sin πu/πu)². Dyson recognized it as the pair
+correlation of eigenvalues of large random Hermitian matrices (GUE), and Odlyzko's
+computations from 1987 on confirmed it numerically.
+
+`zeros_between(n_lo, n_hi)` finds every zero between two good Gram points. It
+evaluates Z at the Gram points, samples each Gram block more finely until it has as
+many sign changes as the block has intervals, then refines every bracket at once
+with a vectorized Illinois method on z_rs. Between n = 10⁷ and 10⁷ + 100,000 it
+finds exactly 100,000 zeros in 18 s. That count matters for the statistics: a
+missed pair of close zeros would hide exactly the small spacings the plot is
+about. The zeros are unfolded with x = θ(γ)/π, which makes the mean spacing 1.
+
+The GUE curve is the exact sine-kernel answer, not the Wigner surmise. The
+probability of no eigenvalue in an interval of length s is the Fredholm
+determinant E(s) = det(I − K) with K(x, y) = sin π(x − y)/(π(x − y)) on [0, s].
+Following Bornemann (2010), Gauss-Legendre quadrature with 40 nodes turns it into
+an ordinary 40×40 determinant, and the error falls exponentially with the node
+count (20 and 60 nodes agree to 1e-12). The spacing density is p(s) = E''(s); E
+is entire, so the code interpolates it with a degree-80 Chebyshev series on
+[0, 6] and differentiates the series twice. Checks: p(s) matches
+π²s²/3 − 2π⁴s⁴/45 + π⁶s⁶/315 for small s, the derivatives agree with 30-digit
+mpmath to 3e-10, p integrates to 1 with mean 1, and the variance comes out
+0.17999 (the Wigner surmise gives 3π/8 − 1 = 0.1781). An independent check
+samples 300 random 120×120 GUE matrices: the KS distance between their bulk
+spacings and the sine-kernel CDF is 0.0044, against 0.28 for Poisson.
+
+The zeros fit GUE well, but not perfectly, and the gap shrinks with height. For
+100,000 consecutive zeros starting at three heights:
+
+| first zero | t range | spacing variance | KS distance to GUE | R₂ − Montgomery, 0.3 < u < 0.9 |
+|---|---|---|---|---|
+| n = 10⁵ | 74,924 to 139,503 | 0.1636 | 0.0174 | −0.012 |
+| n = 10⁶ | 600,271 to 654,852 | 0.1668 | 0.0138 | −0.013 |
+| n = 10⁷ | 4,992,382 to 5,038,615 | 0.1693 | 0.0110 | −0.013 |
+| GUE | | 0.1800 | 0 | 0 |
+
+The zeros are more regular than GUE at these heights: smaller variance, a taller
+peak in the histogram, and slightly fewer close pairs. The variance and the KS
+distance move toward GUE as t grows; the dip in the pair correlation barely moves
+over this range. This is the finite-height
+effect Bogomolny, Keating and coauthors explained by matching the zeros at height
+t to unitary matrices of effective size log(t/2π)/√(12Λ), where Λ ≈ 1.573, which is
+only about 3 at t = 5·10⁶. It decays like 1/log² t, so it is still visible in
+Odlyzko's data near zero number 10²³.
 
 ## Development
 
