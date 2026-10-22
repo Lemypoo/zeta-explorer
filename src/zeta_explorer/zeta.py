@@ -147,3 +147,20 @@ def _log_sin(z: np.ndarray) -> np.ndarray:
     out[~up] = 1j * d + np.log((1 - np.exp(-2j * d)) / 2j)
     return out
 
+
+def xi(s: ArrayLike) -> complex | np.ndarray:
+    z = np.array(s, dtype=complex, ndmin=1).ravel()
+    out = np.empty_like(z)
+    right = z.real >= 0.5
+    for mask, w in ((right, z[right]), (~right, 1 - z[~right])):
+        out[mask] = _xi_right(w)
+    return _out(out.reshape(np.shape(s)), s)
+
+
+def _xi_right(s: np.ndarray) -> np.ndarray:
+    out = np.full(len(s), 0.5 + 0j)
+    ok = s != 1
+    w = s[ok]
+    log_pre = np.log(w / 2) - w / 2 * math.log(math.pi) + loggamma(w / 2)
+    out[ok] = (w - 1) * np.exp(log_pre) * zeta(w)
+    return out

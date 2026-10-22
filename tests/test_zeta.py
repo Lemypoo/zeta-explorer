@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from zeta_explorer.riemann_siegel import theta, z_rs
-from zeta_explorer.zeta import bernoulli, chi, euler_maclaurin, loggamma, zeta
+from zeta_explorer.zeta import bernoulli, chi, euler_maclaurin, loggamma, xi, zeta
 
 
 @pytest.mark.parametrize(
@@ -149,3 +149,26 @@ def test_loggamma_and_chi_on_arrays():
     s = np.array([0.3 + 5j, -4.5 - 20j])
     assert chi(s) == pytest.approx([chi(w) for w in s], rel=1e-15)
 
+
+def _xi_mpmath(s):
+    s = mpmath.mpc(s)
+    return complex(s * (s - 1) / 2 * mpmath.pi ** (-s / 2) * mpmath.gamma(s / 2) * mpmath.zeta(s))
+
+
+@pytest.mark.parametrize("s", [2, 0.3 + 5j, -3 + 2j, 4 - 25j, 0.9999])
+def test_xi_matches_mpmath(s):
+    assert xi(s) == pytest.approx(_xi_mpmath(s), rel=1e-12)
+
+
+def test_xi_special_values_and_symmetry():
+    assert xi(0) == xi(1) == 0.5
+    assert xi(2) == pytest.approx(math.pi / 6, rel=1e-15)
+    s = np.array([0.2 + 3j, -1.5 + 40j, 2.5 - 9j])
+    assert xi(s) == pytest.approx(xi(1 - s), rel=1e-12)
+    assert xi(s.conj()) == pytest.approx(xi(s).conj(), rel=1e-12)
+
+
+@pytest.mark.parametrize("t", [5.0, 14.134725141734693, 60.0])
+def test_xi_real_on_critical_line(t):
+    v = xi(0.5 + 1j * t)
+    assert abs(v.imag) <= 1e-12 * abs(v) + 1e-15
