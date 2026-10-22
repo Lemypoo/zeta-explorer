@@ -120,3 +120,32 @@ def test_z_from_own_zeta(t):
     z = cmath.exp(1j * theta(t)) * zeta(0.5 + 1j * t)
     assert abs(z.imag) < 1e-10
     assert z.real == pytest.approx(z_rs(t), abs=1e-7)
+
+
+def test_zeta_on_arrays_matches_scalar_calls():
+    rng = np.random.default_rng(11)
+    s = (rng.uniform(-20, 20, 60) + 1j * rng.uniform(-300, 300, 60)).reshape(3, 20)
+    values = zeta(s)
+    assert values.shape == (3, 20)
+    for z, v in zip(s.ravel(), values.ravel(), strict=True):
+        assert abs(zeta(z) - v) <= 1e-14 * abs(v)
+
+
+def test_zeta_array_with_trivial_zeros_and_real_points():
+    values = zeta(np.array([-6.0, -4.0, -3.0, 0.0, 2.0]))
+    expected = [0, 0, 1 / 120, -0.5, math.pi**2 / 6]
+    assert values == pytest.approx(expected, rel=1e-14, abs=1e-15)
+    assert np.all(values.imag == 0)
+
+
+def test_zeta_array_rejects_pole():
+    with pytest.raises(ValueError):
+        zeta(np.array([2.0, 1.0]))
+
+
+def test_loggamma_and_chi_on_arrays():
+    z = np.array([0.5, 3 - 7j, 0.1 + 1_000j])
+    assert loggamma(z) == pytest.approx([loggamma(w) for w in z], rel=1e-15)
+    s = np.array([0.3 + 5j, -4.5 - 20j])
+    assert chi(s) == pytest.approx([chi(w) for w in s], rel=1e-15)
+
