@@ -225,3 +225,81 @@ Design notes:
 
 Next: an animation sweeping σ across the strip, then the 3D |ζ| landscape, then
 a first static web page with precomputed zeros and the explicit-formula curves.
+
+## 2026-10-23 (afternoon): fast multi-evaluation of Z, the 3D landscape, the σ sweep
+
+Built:
+
+- `multieval.py`: `nufft`, a type-1 nonuniform FFT by Gaussian gridding (2x
+  oversampled grid, spreading width from the tolerance, deconvolution by
+  e^(τk²)); `fft_size`, the next 5-smooth length; and `ZWindow`, a simplified
+  Odlyzko-Schönhage evaluator. The window computes the Riemann-Siegel main sum on
+  an evenly spaced grid with one NUFFT, interpolates between grid points with a
+  Gaussian-windowed sinc, and adds the C0 to C4 remainder. `zeros_fast(n_lo, n_hi)`
+  runs the Gram-block zero finder on top of it.
+- `riemann_siegel.py`: split out `theta_tail` and `rs_remainder` so the window
+  can reuse them.
+- `spacing.py`: the Gram-block logic became `gram_block_zeros(g, n0, sample,
+  refine)` so it works with any Z. It now handles Rosser violations by merging a
+  short block with the previous block and then the following ones.
+  `illinois_many` takes an absolute tolerance.
+- Plots: `plot_landscape` (log|ζ| as a 3D surface), `sweep_sigma` (an animation
+  of ζ(σ + it) as σ crosses the strip, saved as a GIF), and `plot_multieval`
+  (accuracy and cost against the direct sum). All three rendered and checked by
+  eye.
+
+Checks:
+
+- NUFFT against the direct sum: error below tol·Σ|c| for m = 64, 250, 1000 and
+  tol = 1e-6, 1e-10, 1e-13.
+- Window against mpmath `siegelz`: 2e-13, 8e-14, 3e-13, 2e-13, 1e-13 at
+  t = 10⁴, 10⁶, 10⁸, 10¹⁰, 10¹². The direct sum at the same points: 1e-11, 3e-9,
+  5e-7, 6e-5, 3.5e-3. Also exact on both sides of a jump in N at t = 2π·200².
+- All 10⁴ zeros in Odlyzko's table for n = 10¹² + 1 to 10¹² + 10⁴: max difference
+  2.8e-9, RMS 7e-10, in 2.5 s. The numbering matches the Gram-point count.
+- Spacing statistics recomputed at n = 10⁷ with the window match the old row
+  exactly (0.1693, 0.0110, −0.013), in 11 s instead of 18 s.
+- Rosser violations: none in 100,000 Gram intervals from n = 10⁹, four from
+  n = 10¹². A synthetic Z with a borrowed pair of zeros tests the merge, and one
+  with a missing pair tests the error.
+
+Benchmarks (this machine, 20,000 points per height, after the window is built):
+
+| t | N | direct sum | window | window build |
+|---|---|---|---|---|
+| 10⁶ | 399 | 7.4 μs | 2.6 μs | 0.01 s |
+| 10⁸ | 3,989 | 58 μs | 2.5 μs | 0.03 s |
+| 10¹⁰ | 39,894 | 795 μs | 2.6 μs | 0.25 s |
+| 10¹² | 206,393 | 7.7 ms | 2.6 μs | about 1.3 s |
+
+Design notes:
+
+- Precision was the bigger win. t·log n is ~10¹³ rad at t = 10¹², so a double
+  phase is off by ~10⁻³. The window computes t₀ log n mod 2π and θ(t₀) once in
+  mpmath and works in the offset u = t − t₀ from then on. θ(t₀ + u) − θ(t₀) is
+  written with log1p so no term is large. Zeros and Gram points come back as
+  offsets, since a double near 2.7·10¹¹ only resolves 6e-5.
+- Interpolation error: with sampling at α = 2β, a sinc of bandwidth α and a
+  Gaussian window with ε² = (α − β)/(Kδ), both the spectral leakage and the
+  truncation are e^(−πK/4). K = 36 for 1e-12, and the bound
+  e^(−9π) = 5e-13 sits just above the measured 1e-13 to 3e-13.
+- Gaussian gridding needed w = 15 grid points on each side for 1e-13. The
+  exponential-of-semicircle kernel FINUFFT uses would need fewer, but its
+  Fourier transform has no closed form, and spreading is not the bottleneck
+  here. The mpmath phases are: about 1 s of the 1.3 s build at 10¹².
+- When N changes inside a window the grid uses the larger N and subtracts the
+  last term directly where t is below 2πN². That beats splitting the window.
+- zeros_fast's profile at 10¹² is now dominated by `np.polyval` in the
+  degree-90 remainder polynomials, which get called on small arrays many times
+  during root refinement.
+- The first landscape drafts plotted |ζ| capped at 4 or 5. The pits at the zeros
+  were hidden behind the front of the surface, and the cap made a flat yellow
+  plateau. log₁₀|ζ| clipped to [−1.5, 1], with the zeros added to the t grid,
+  fixed both. Viewing from higher up floated the zero markers off the surface,
+  so the camera stays at 42°.
+- The sweep uses σ = 0.5 + 0.4·sin³ so the animation pauses near the critical
+  line; with a plain sine it rushed through σ = 1/2 in one frame.
+
+Next: a static web page with precomputed data, then ζ in the browser with a
+canvas domain coloring. Shrinking the remainder polynomials (degree 90 is far
+more than doubles need) would speed up zeros_fast.
