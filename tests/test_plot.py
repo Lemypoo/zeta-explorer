@@ -9,6 +9,7 @@ from zeta_explorer.plot import (
     plot_domain,
     plot_explicit,
     plot_gram,
+    plot_landscape,
     plot_lehmer,
     plot_log_z,
     plot_rs_error,
@@ -94,3 +95,10 @@ def test_plot_log_z():
     texts = [t.get_text() for t in fig.axes[0].get_legend().get_texts()]
     assert texts[0].startswith("log|ζ(1/2 + it)|, 2,000 random t")
     assert "CUE, N = 8" in texts[1]
+
+
+def test_plot_landscape_puts_a_pit_at_each_zero():
+    fig = plot_landscape(t_max=30, width=120)
+    pits = fig.axes[0].collections[-1]
+    assert np.allclose(sorted(pits._offsets3d[0]), [14.134725, 21.022040, 25.010858], atol=1e-6)
+

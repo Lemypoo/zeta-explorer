@@ -375,6 +375,52 @@ def plot_log_z(sample: np.ndarray, T: float, N: int, bins: int = 120) -> Figure:
     return fig
 
 
+def plot_landscape(
+    t_min: float = 0.0, t_max: float = 40.0, sigma_min: float = -0.5, sigma_max: float = 2.0,
+    floor: float = -1.5, ceiling: float = 1.0, width: int = 600,
+) -> Figure:
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import LightSource
+
+    zeros = find_zeros(max(t_min, 10.0), t_max)
+    t = np.union1d(np.linspace(t_min, t_max, width), zeros)
+    rows = int(round(width * (sigma_max - sigma_min) / (t_max - t_min))) * 2
+    sigma = np.union1d(np.linspace(sigma_min, sigma_max, rows), [0.5, 1.0])
+    S, T = np.meshgrid(sigma, t, indexing="ij")
+    s = S + 1j * T
+    w = np.full(s.shape, ceiling)
+    finite = s != 1
+    with np.errstate(divide="ignore"):
+        w[finite] = np.clip(np.log10(np.abs(zeta(s[finite]))), floor, ceiling)
+
+    fig = plt.figure(figsize=(11, 6), facecolor=SURFACE)
+    ax = fig.add_subplot(projection="3d", computed_zorder=False)
+    ax.set_facecolor(SURFACE)
+    light = LightSource(azdeg=300, altdeg=40)
+    rgb = light.shade(w, cmap=plt.get_cmap("viridis"), vmin=floor, vmax=ceiling,
+                      blend_mode="soft", vert_exag=0.3)
+    ax.plot_surface(T, S, w, facecolors=rgb, rstride=1, cstride=1, linewidth=0,
+                    antialiased=False, shade=False)
+    ax.scatter(zeros, np.full(len(zeros), 0.5), np.full(len(zeros), floor), color=ACCENT, s=16,
+               depthshade=False)
+    ax.view_init(elev=42, azim=-70)
+    ax.set_box_aspect((2.6, 1.1, 0.7), zoom=1.2)
+    ax.set_xlim(t_min, t_max)
+    ax.set_ylim(sigma_min, sigma_max)
+    ax.set_zlim(floor, ceiling)
+    for axis in (ax.xaxis, ax.yaxis, ax.zaxis):
+        axis.set_pane_color(SURFACE)
+        axis._axinfo["grid"]["color"] = GRID
+    ax.tick_params(colors=INK_SECONDARY, labelsize=8)
+    ax.set_xlabel("t = Im s", color=INK)
+    ax.set_ylabel("σ = Re s", color=INK)
+    ax.set_zlabel("log₁₀ |ζ(s)|", color=INK)
+    fig.text(0.02, 0.95, f"log |ζ(σ + it)|: a spike at the pole s = 1 and a pit at each of the "
+             f"{len(zeros)} zeros on σ = 1/2", color=INK, fontsize=12)
+    fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
+    return fig
+
+
 def _style(ax) -> None:
     ax.grid(color=GRID, linewidth=0.8)
     ax.set_axisbelow(True)
