@@ -157,3 +157,70 @@ Design notes:
 Next: an animation sweeping σ across the strip, then the explicit formula
 rebuilding π(x) from the zeros, then Lehmer pairs (the closest zeros found by
 zeros_between are a natural place to start).
+
+## 2026-10-23: explicit formula, Lehmer pairs, value distribution
+
+Built:
+
+- `spacing.first_zeros(n)`: the first n zeros, mpmath sign scan below the good
+  Gram point g_79 and `zeros_between` above it, with a count check at the seam.
+- `explicit.py`: complex Ei from scratch (series, E1 continued fraction with a
+  depth that depends on |w|, asymptotic series past |w| = 40), li, Riemann's R
+  from the Gram series, a sieve for π and ψ, Möbius, the tail integral by
+  Gauss-Laguerre, and the explicit formulas for ψ(x), J(x) and π(x) from a list
+  of zeros.
+- `lehmer.py`: the Csordas-Smith-Varga sum g for every consecutive pair (exact
+  over a window of neighbors and mirrored negative zeros, closed-form smooth
+  density outside it), the Lehmer test Δ²g < 4/5, and the resulting lower bound
+  on the de Bruijn-Newman constant.
+- `values.py`: extrema of Z between zeros by vectorized golden section, running
+  records, random samples of log|Z|, exact CUE cumulants from polygamma sums and
+  the CUE density by Fourier inversion of the Keating-Snaith product.
+- Plots: π(x) and ψ(x) − x rebuilt from 10, 100 and 1000 zeros, Lehmer's pair
+  with a zoom, and the log|ζ| histogram against CUE and Selberg. All three
+  rendered and checked by eye; the first drafts had a missing 1000-zero curve
+  and colliding tick labels on the zoom, both fixed.
+
+Checks:
+
+- Ei vs mpmath on 2,851 random points: max relative error 1.5e-15. R(x) and li(x)
+  to 1e-13, the tail integral to 1e-10 against mpmath quadrature.
+- With 1000 zeros: π(x) within 0.033 on the half-integers up to 100.5 and rounds
+  correctly on 1000.5 to 1099.5; ψ within 0.148. 100 zeros are 4 to 6 times worse.
+  At a prime both formulas land on the midpoint of the jump.
+- g against an independent formula from the Hadamard product of Ξ (Z', Z'', Z'''
+  from mpmath at the zeros): relative error about 3e-6.
+- 29 Lehmer pairs below t = 1000, matching Stopple (2017). Near t = 10⁶, 7,384 of
+  114,660 pairs, against Stopple's 7,398 of 114,661. Lehmer's pair at 7005 gives
+  λ = −7.112e-4, and the maximum of Z between its zeros sits at 7005.0818554, next
+  to Stopple's ζ' zero at 7005.08185555. The van de Lune pair's published Δ gives
+  −5.894e-9 against the published −5.895e-9.
+- Z extrema have |Z'| < 1e-6 by mpmath; the record |Z| below 10⁵ is 28.216 at
+  t = 77,403.722.
+- CUE: cumulants vs mpmath polygamma to 1e-13; the density integrates to 1 and
+  reproduces κ₂, κ₃; 20,000 Haar unitaries of size 12 fit the density within 0.015.
+- log|Z| at T = 2π·e^N for N = 8 to 16 (200,000 samples each): variance 1.73 to
+  2.09, CUE 1.83 to 2.18, Selberg 1.14 to 1.44.
+
+Design notes:
+
+- li(x^ρ) has to be Ei(ρ log x). The principal branch of li at the complex
+  point x^ρ is wrong once γ log x > π, which is almost always.
+- The continued fraction for E1 needs over 200 terms near the negative real
+  axis at |z| = 10, and the series loses e^(0.3|w|) digits within π/4 of the
+  positive real axis. Rather than paper over that wedge, `ei` raises there. The
+  explicit formula only evaluates near the imaginary axis.
+- The Lehmer bound is stated for zeros of H₀, which are 2γ. I first wrote it with
+  γ and got a bound 4 times too small; the 1993 paper's van de Lune numbers
+  (λ ≈ −Δ²/8 in x units) settled the convention. Stopple's paper writes the same
+  definition in γ, which is fine for Δ²g but not for λ.
+- Negative zeros matter at the bottom: for the first pair they are about 4% of g.
+  They are summed exactly over the first 500 zeros.
+- The zeta variance sits 0.07 to 0.10 below CUE at every height. That's
+  presumably the arithmetic factor from small primes, which I haven't derived, so
+  the README just reports it.
+- An mpmath `zetazero(6709)` call ran for minutes, so the reference g uses
+  `findroot` on `siegelz` started from our own zeros instead.
+
+Next: an animation sweeping σ across the strip, then the 3D |ζ| landscape, then
+a first static web page with precomputed zeros and the explicit-formula curves.
