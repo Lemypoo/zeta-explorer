@@ -312,11 +312,12 @@ def plot_explicit(
     return fig
 
 
-def plot_lehmer(t_min: float = 6995.0, t_max: float = 7015.0, samples: int = 2000) -> Figure:
+def plot_lehmer(n: int = 6709, half_width: float = 10.0, samples: int = 2000) -> Figure:
     import matplotlib.pyplot as plt
 
-    gamma = first_zeros(6720)[6700:]
-    a, b = gamma[8], gamma[9]
+    gamma = first_zeros(n + 64)
+    a, b = gamma[n - 1], gamma[n]
+    t_min, t_max = a - half_width, a + half_width
     pad = 2 * (b - a)
     t = np.linspace(t_min, t_max, samples)
     zoom = np.linspace(a - pad, b + pad, samples // 2)
@@ -337,13 +338,13 @@ def plot_lehmer(t_min: float = 6995.0, t_max: float = 7015.0, samples: int = 200
     left.axvspan(a - pad, b + pad, color=ACCENT, alpha=0.15, linewidth=0)
     left.set_xlim(t_min, t_max)
     left.set_ylabel("Z(t)", color=INK)
-    left.set_title("Z(t) near t = 7005", color=INK, fontsize=11, loc="left")
+    left.set_title(f"Z(t) near t = {a:.0f}", color=INK, fontsize=11, loc="left")
     right.plot([a - origin, b - origin], [0, 0], "o", color=ACCENT, markersize=7,
                markeredgecolor=SURFACE, markeredgewidth=1.5)
     right.set_xlim(zoom[0] - origin, zoom[-1] - origin)
-    right.set_title(f"Zeros 6709 and 6710, {b - a:.4f} apart", color=INK, fontsize=11,
+    right.set_title(f"Zeros {n} and {n + 1}, {b - a:.4f} apart", color=INK, fontsize=11,
                     loc="left")
-    fig.suptitle("Lehmer's pair: Z barely crosses zero twice", color=INK, fontsize=12, x=0.01,
+    fig.suptitle("A Lehmer pair: Z barely crosses zero twice", color=INK, fontsize=12, x=0.01,
                  ha="left")
     fig.tight_layout()
     return fig

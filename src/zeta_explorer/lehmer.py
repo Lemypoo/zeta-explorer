@@ -13,11 +13,6 @@ T0 = 9.676906787165866
 LEHMER_THRESHOLD = 0.8
 
 
-def smooth_count(t: ArrayLike) -> np.ndarray:
-    u = np.asarray(t, dtype=float) / TWO_PI
-    return u * (np.log(u) - 1) + 7 / 8
-
-
 def _smooth_sum(c: np.ndarray, lo: ArrayLike, hi: ArrayLike) -> np.ndarray:
     def G(t):
         t = np.asarray(t, dtype=float)

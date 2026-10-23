@@ -2,7 +2,7 @@ import mpmath
 import numpy as np
 import pytest
 
-from zeta_explorer.lehmer import T0, lehmer_pairs, lehmer_sums, newman_bound, smooth_count
+from zeta_explorer.lehmer import T0, lehmer_pairs, lehmer_sums, newman_bound
 from zeta_explorer.riemann_siegel import theta
 from zeta_explorer.spacing import first_zeros, zeros_between
 
@@ -25,10 +25,15 @@ def _hadamard_g(a, b):
     return _hadamard_half(a, b) + _hadamard_half(b, a)
 
 
-def test_smooth_count():
-    assert smooth_count(T0) == pytest.approx(0, abs=1e-14)
+def _smooth_count(t):
+    u = t / (2 * np.pi)
+    return u * (np.log(u) - 1) + 7 / 8
+
+
+def test_t0_is_where_the_smooth_count_starts():
+    assert _smooth_count(T0) == pytest.approx(0, abs=1e-14)
     for t in (1e3, 1e5):
-        assert smooth_count(t) == pytest.approx(theta(t) / np.pi + 1, abs=1e-4)
+        assert _smooth_count(t) == pytest.approx(theta(t) / np.pi + 1, abs=1e-4)
 
 
 @pytest.mark.parametrize("i", [0, 50, 700])
