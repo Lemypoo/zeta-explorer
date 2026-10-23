@@ -10,11 +10,13 @@ you get the real-valued Riemann-Siegel Z function, which changes sign at every z
 This repo computes θ, Z, ζ(s) itself, the zeros and the Gram points straight from
 the formulas, checks the results against mpmath, and uses Turing's method to prove
 the zero count is complete: all 138,069 zeros of ζ with 0 < Im s ≤ 100000 are on
-the critical line and simple. It also draws ζ over the complex plane, and it
-compares 100,000 zeros near t = 5·10⁶ with the eigenvalue statistics of large
-random Hermitian matrices.
+the critical line and simple. It also draws ζ over the complex plane, compares
+100,000 zeros near t = 5·10⁶ with the eigenvalue statistics of large random
+Hermitian matrices, rebuilds π(x) from the first 1000 zeros, hunts for Lehmer
+pairs (the near misses that bound the de Bruijn-Newman constant), and checks the
+value distribution of log|ζ(1/2 + it)| against random unitary matrices.
 
-Animations, the explicit formula for π(x) and a browser version come next.
+Animations and a browser version come next.
 
 ## Install
 
@@ -48,6 +50,16 @@ zeta(np.array([-3, 0.5 + 14.134725141734693j]))   # vectorized: [1/120, ~1e-16]
 from zeta_explorer.spacing import zeros_between, normalized_spacings
 z = zeros_between(10**6, 10**6 + 5)   # zeros between Gram points g_1000000 and g_1000005
 # [600270.74787059, 600271.48637367, 600271.76148043, 600272.00103217, 600273.02653325]
+
+from zeta_explorer.spacing import first_zeros
+from zeta_explorer.explicit import pi_from_zeros, riemann_r
+gamma = first_zeros(1000)  # the first 1000 zeros, 14.1347 to 1419.4225
+pi_from_zeros(np.array([100.5, 10_000.5]), gamma)   # [25.026, 1229.54]; π = 25, 1229
+riemann_r(1e15)      # 29844570495886.9
+
+from zeta_explorer.lehmer import lehmer_pairs
+pairs = lehmer_pairs(gamma[:700])   # pairs with Δ²g < 4/5
+pairs[0]   # LehmerPair(n=34, gamma=111.0295..., delta=0.8451..., gap=0.3868..., score=0.5699..., bound=-0.3954...)
 
 from zeta_explorer.plot import plot_z, plot_domain, plot_spiral, plot_spacing
 plot_z(0, 60).savefig("z.png")
@@ -288,6 +300,163 @@ effect Bogomolny, Keating and coauthors explained by matching the zeros at heigh
 t to unitary matrices of effective size log(t/2π)/√(12Λ), where Λ ≈ 1.573, which is
 only about 3 at t = 5·10⁶. It decays like 1/log² t, so it is still visible in
 Odlyzko's data near zero number 10²³.
+
+### The explicit formula
+
+![pi(x) and psi(x) rebuilt from 10, 100 and 1000 zeros](docs/explicit.png)
+
+Riemann's 1859 formula writes the prime counting function as a smooth main term
+minus a sum over the zeros. The cleanest version is for Chebyshev's
+ψ(x) = Σ_{p^k ≤ x} log p:
+
+```
+ψ(x) = x − Σ_ρ x^ρ/ρ − log 2π − ½·log(1 − x⁻²)
+```
+
+For π(x) it goes through J(x) = Σ_k π(x^(1/k))/k, which jumps by 1/k at every
+prime power p^k:
+
+```
+J(x) = li(x) − Σ_ρ li(x^ρ) − log 2 + ∫_x^∞ dt / (t(t² − 1) log t)
+π(x) = Σ_n μ(n)/n · J(x^(1/n))
+```
+
+The sum over n stops once x^(1/n) < 2, since J is 0 there. Both sums over ρ pair
+each zero with its conjugate and run in order of height. At a jump both formulas
+converge to the midpoint, so the code gives ψ(97) − ½·log 97 for ψ(97) and 24.5
+for π(97).
+
+The awkward part is li(x^ρ). Taking li of the complex number x^ρ lands on the
+wrong branch as soon as γ·log x passes π, so it has to be Ei(ρ·log x). `ei(w)` is
+written from scratch with three regimes: the power series for |w| < 4, the
+continued fraction for E₁ (backward recurrence, depth 20 to 140 depending on |w|)
+out to |w| = 40, and the asymptotic series beyond that. It matches mpmath to
+1.5e-15 relative on 2,851 random points. The one region it refuses is
+4 ≤ |w| < 40 within π/4 of the positive real axis, where neither the continued
+fraction nor the series is accurate in doubles. The explicit formula never goes
+there, because ρ·log x sits next to the imaginary axis. li(x) for real x, Riemann's
+R(x) from the Gram series Σ (log x)^k/(k·k!·ζ(k+1)), and the tail integral
+(40-node Gauss-Laguerre after substituting t = e^v) are all checked against
+mpmath.
+
+With the first 1000 zeros, on the half-integers 2.5 ≤ x ≤ 100.5:
+
+| zeros | max error ψ | RMS error ψ | max error π | RMS error π |
+|---|---|---|---|---|
+| 100 | 0.96 | 0.28 | 0.21 | 0.069 |
+| 1000 | 0.148 | 0.050 | 0.033 | 0.012 |
+
+π(x) from 1000 zeros also rounds to the right integer at every half-integer from
+1000.5 to 1099.5 (worst error 0.35), and π(10000.5) comes out as 1229.54 against
+the true 1229. The left panel, 3000 values of x and 1000 zeros, takes 3.3 s. The
+zeros come from `first_zeros(n)`, which sign-scans mpmath's Z below the good Gram
+point g₇₉ ≈ 201.5 and uses `zeros_between` above it.
+
+### Lehmer pairs
+
+![Z(t) near t = 7005 and the two zeros 0.0377 apart](docs/lehmer.png)
+
+In 1956 Lehmer found two zeros near t = 7005 only 0.0377 apart, with Z rising to
+just 0.004 between them. Close pairs like this used to give lower bounds on the
+de Bruijn-Newman constant Λ (Rodgers and Tao proved Λ ≥ 0 in 2018). In the
+convention of Csordas, Smith and Varga the zeros are x = 2γ, the zeros of
+H₀(x) = Ξ(x/2)/8. A pair x_k < x_(k+1) with Δ = x_(k+1) − x_k and
+
+```
+g = Σ_{j ≠ k, k+1} [ 1/(x_j − x_k)² + 1/(x_j − x_(k+1))² ]     (j over positive and negative zeros)
+```
+
+is a Lehmer pair if Δ²g < 4/5, and then
+
+```
+Λ ≥ λ = [ (1 − 5Δ²g/4)^(4/5) − 1 ] / (8g)
+```
+
+Δ²g doesn't depend on the scale, so the code works with γ directly and divides
+by 2g instead of 8g. `lehmer_sums` adds the 500 nearest zeros on each side
+exactly, the mirrored negative zeros exactly over the first 500, and everything
+further out through the smooth density log(t/2π)/2π, integrated in closed form.
+That density integrates to the main term of θ(t)/π + 1 when it starts from
+T₀ = 9.6769, where the smooth count is zero.
+
+The real check doesn't use any list of zeros. Ξ(t) is even with real zeros ±γ,
+so −(log Ξ)''(t) = Σ_j [1/(t − γ_j)² + 1/(t + γ_j)²]. Removing the two singular
+terms leaves g in terms of Z', Z'' and Z''' at the two zeros plus a trigamma term
+from the Gamma factor, all of which mpmath computes directly. The two agree to
+3e-6 relative, both on the first pair and on Lehmer's.
+
+Results:
+
+- Below t = 1000 there are exactly 29 Lehmer pairs among the 649 zeros, the count
+  Stopple reports in "Lehmer pairs revisited" (2017).
+- Lehmer's pair (zeros 6709 and 6710): Δ = 0.0376985 in γ, Δ²g = 0.006933 and
+  λ = −7.112e-4. The maximum of Z between them is 0.00397 at t = 7005.0818554,
+  next to the zero of ζ' that Stopple lists at 7005.08185555.
+- Up to t = 10⁵, 8,262 of the 138,068 consecutive pairs (6.0%) are Lehmer pairs.
+  The tightest is zeros 95,248 and 95,249 near t = 71,732.90: 0.0147 apart (0.022
+  mean spacings), with Δ²g = 0.0020 and λ = −1.08e-4.
+- Starting at t ≈ 10⁶, 7,384 of 114,660 consecutive pairs qualify. Stopple counts
+  7,398 of 114,661 near the same height, presumably over a slightly different
+  window.
+- Csordas, Odlyzko, Smith and Varga (1993) give Δ = 2.171392e-4 in x units for the
+  pair van de Lune, te Riele and Winter found near t = 3.9·10⁸. `newman_bound`
+  turns that into −5.894e-9; their published bound is −5.895e-9. That pair is out
+  of reach here: Z peaks at about 1e-8 between the two zeros, below the rounding
+  floor of z_rs at that height.
+
+### Large values and the value distribution
+
+`z_extrema(gamma)` finds the extremum of Z between each pair of consecutive zeros
+with a vectorized golden-section search (Z is unimodal between consecutive zeros
+in practice). Over all 138,068 gaps below t = 10⁵ (26 s), the running record of
+|Z| ends with
+
+| t | Z(t) |
+|---|---|
+| 50,626.478 | 23.747 |
+| 55,104.583 | −24.830 |
+| 63,751.863 | −26.073 |
+| 74,956.025 | −27.694 |
+| 77,403.722 | 28.216 |
+
+and each of those values matches mpmath's `siegelz` to 1e-10.
+
+![Histogram of log|zeta| near t = 5.6e7 with the CUE density and Selberg's normal](docs/log_z.png)
+
+Selberg's central limit theorem says log|ζ(1/2 + it)| divided by
+sqrt(½·log log T) tends to a standard normal. Keating and Snaith (2000) proposed a
+much sharper model: the characteristic polynomial of a random N×N unitary matrix
+(CUE) with N = log(T/2π). Its moment generating function is exact,
+
+```
+E|det(I − U)|^s = Π_{j=1..N} Γ(j)·Γ(j + s) / Γ(j + s/2)²
+```
+
+so the cumulants are κ_m = (1 − 2^(1−m))·Σ_{j≤N} ψ^(m−1)(j), and the density
+comes from Fourier inversion of the product along s = iu (trapezoid rule, step
+0.01). The density integrates to 1 within 1e-9, its moments match the cumulants,
+and a histogram of 20,000 Haar-random 12×12 unitaries sits within 0.015 of it.
+
+Sampling 200,000 random t in [T, 1.01·T] with T = 2π·e^N, so that N is an
+integer:
+
+| N | T | variance | κ₃ | CUE variance | CUE κ₃ | Selberg ½ log log T |
+|---|---|---|---|---|---|---|
+| 8 | 1.87·10⁴ | 1.730 | −2.10 | 1.829 | −2.374 | 1.143 |
+| 10 | 1.38·10⁵ | 1.864 | −2.20 | 1.940 | −2.393 | 1.236 |
+| 12 | 1.02·10⁶ | 1.957 | −2.14 | 2.031 | −2.405 | 1.314 |
+| 14 | 7.56·10⁶ | 2.019 | −2.13 | 2.108 | −2.414 | 1.381 |
+| 16 | 5.58·10⁷ | 2.093 | −2.10 | 2.175 | −2.421 | 1.441 |
+
+The means are all within 0.011 of zero. Selberg's normal is far too narrow at
+these heights: the variance does grow like ½ log log T, but with 0.59 to 0.65 on
+top. CUE gets the variance within 0.1, and it gets the strong negative skew right
+in sign and roughly in size (log|ζ| has a long left tail from the zeros). The
+remaining gap in the variance, 0.074 to 0.099, doesn't shrink with N. It looks
+like the arithmetic correction from small primes that the hybrid model of Gonek,
+Hughes and Keating puts on top of CUE, but I haven't computed that constant. The
+fourth cumulant (5.5 to 6.7, against 6.3 for CUE) is too noisy at this sample
+size to say more.
 
 ## Development
 
