@@ -421,6 +421,51 @@ def plot_landscape(
     return fig
 
 
+def sweep_sigma(
+    t_max: float = 40.0, frames: int = 60, samples: int = 1500, amplitude: float = 0.4,
+):
+    import matplotlib.pyplot as plt
+    from matplotlib.animation import FuncAnimation
+
+    t = np.linspace(0, t_max, samples)
+    sigmas = 0.5 + amplitude * np.sin(2 * np.pi * np.arange(frames) / frames) ** 3
+    curves = zeta(sigmas[:, None] + 1j * t[None, :])
+    zeros = find_zeros(10, t_max)
+
+    fig, (left, right) = plt.subplots(1, 2, figsize=(10, 4.6), facecolor=SURFACE,
+                                      gridspec_kw={"width_ratios": [1, 1.35]})
+    for ax in (left, right):
+        ax.set_facecolor(SURFACE)
+        _style(ax)
+    reach = np.abs(curves[:, t > 5]).max() * 1.05
+    spiral, = left.plot([], [], color=SERIES, linewidth=1.2)
+    left.plot([0], [0], "o", color=ACCENT, markersize=6, markeredgecolor=SURFACE)
+    left.set_xlim(-reach, reach)
+    left.set_ylim(-reach, reach)
+    left.set_aspect("equal")
+    left.set_xlabel("Re ζ(σ + it)", color=INK)
+    left.set_ylabel("Im ζ(σ + it)", color=INK)
+    modulus, = right.plot([], [], color=SERIES, linewidth=1.4)
+    right.plot(zeros, np.zeros(len(zeros)), "o", color=ACCENT, markersize=6,
+               markeredgecolor=SURFACE)
+    right.set_xlim(0, t_max)
+    right.set_ylim(0, reach)
+    right.set_xlabel("t", color=INK)
+    right.set_ylabel("|ζ(σ + it)|", color=INK)
+    title = fig.suptitle("", color=INK, fontsize=12, x=0.01, ha="left")
+    fig.tight_layout()
+
+    def draw(i):
+        w = curves[i]
+        spiral.set_data(w.real, w.imag)
+        modulus.set_data(t, np.abs(w))
+        title.set_text(f"σ = {sigmas[i]:.2f}: ζ(σ + it) for 0 ≤ t ≤ {t_max:g}, "
+                       "zeros only when σ = 1/2")
+        return spiral, modulus, title
+
+    return FuncAnimation(fig, draw, frames=frames, interval=80, blit=False)
+
+
 def _style(ax) -> None:
     ax.grid(color=GRID, linewidth=0.8)
     ax.set_axisbelow(True)

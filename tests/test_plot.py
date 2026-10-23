@@ -2,6 +2,8 @@ import math
 
 import matplotlib
 import numpy as np
+from matplotlib.animation import PillowWriter
+from PIL import Image
 
 from zeta_explorer.plot import (
     phase_colors,
@@ -16,6 +18,7 @@ from zeta_explorer.plot import (
     plot_spacing,
     plot_spiral,
     plot_z,
+    sweep_sigma,
 )
 from zeta_explorer.spacing import first_zeros, zeros_between
 from zeta_explorer.values import log_z_sample
@@ -101,4 +104,10 @@ def test_plot_landscape_puts_a_pit_at_each_zero():
     fig = plot_landscape(t_max=30, width=120)
     pits = fig.axes[0].collections[-1]
     assert np.allclose(sorted(pits._offsets3d[0]), [14.134725, 21.022040, 25.010858], atol=1e-6)
+
+
+def test_sweep_sigma_writes_every_frame(tmp_path):
+    anim = sweep_sigma(t_max=30, frames=8, samples=300)
+    anim.save(tmp_path / "sweep.gif", writer=PillowWriter(fps=6), dpi=40)
+    assert Image.open(tmp_path / "sweep.gif").n_frames == 8
 
