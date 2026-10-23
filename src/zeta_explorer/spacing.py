@@ -9,7 +9,7 @@ from numpy.typing import ArrayLike
 
 from zeta_explorer.gram import RS_FROM, good_gram, z_values
 from zeta_explorer.riemann_siegel import theta, z_rs
-from zeta_explorer.zeros import gram_points, illinois_many
+from zeta_explorer.zeros import find_zeros, gram_points, illinois_many
 
 S_MAX = 6.0
 
@@ -37,6 +37,27 @@ def zeros_between(n_lo: int, n_hi: int, rtol: float = 1e-12, max_level: int = 10
         f_hi.append(zs[1:][change])
     a, b, fa, fb = (np.concatenate(x) for x in (lo, hi, f_lo, f_hi))
     return illinois_many(z_rs, a, b, fa, fb, rtol)
+
+
+@functools.cache
+def _low_zeros() -> tuple[int, np.ndarray]:
+    m = math.ceil(theta(RS_FROM) / math.pi)
+    while not good_gram(z_values(gram_points([m])), n0=m)[0]:
+        m += 1
+    low = np.array(find_zeros(10, float(gram_points([m])[0])))
+    if len(low) != m + 1:
+        raise RuntimeError(f"found {len(low)} zeros below g_{m}, expected {m + 1}")
+    return m, low
+
+
+def first_zeros(n: int) -> np.ndarray:
+    m, low = _low_zeros()
+    if n <= len(low):
+        return low[:n].copy()
+    hi = n + 8
+    while len(high := zeros_between(m, hi)) < n - len(low):
+        hi += 16
+    return np.concatenate((low, high))[:n]
 
 
 def unfold(gamma: ArrayLike) -> np.ndarray:

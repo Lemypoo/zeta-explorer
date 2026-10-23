@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 from zeta_explorer.spacing import (
+    first_zeros,
     gap_probability,
     gue_spacing,
     gue_spacing_cdf,
@@ -140,3 +141,12 @@ def test_unfolded_zeros_have_unit_mean_spacing():
 def test_zeros_between_rejects_low_heights():
     with pytest.raises(ValueError):
         zeros_between(10, 50)
+
+
+def test_first_zeros_cross_the_mpmath_seam():
+    z = first_zeros(300)
+    assert len(z) == 300
+    assert np.all(np.diff(z) > 0)
+    reference = [float(mpmath.zetazero(k).imag) for k in (1, 80, 81, 300)]
+    assert [z[0], z[79], z[80], z[299]] == pytest.approx(reference, abs=1e-8)
+    assert np.array_equal(first_zeros(40), z[:40])
