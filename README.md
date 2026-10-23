@@ -14,9 +14,12 @@ the critical line and simple. It also draws ζ over the complex plane, compares
 100,000 zeros near t = 5·10⁶ with the eigenvalue statistics of large random
 Hermitian matrices, rebuilds π(x) from the first 1000 zeros, hunts for Lehmer
 pairs (the near misses that bound the de Bruijn-Newman constant), and checks the
-value distribution of log|ζ(1/2 + it)| against random unitary matrices.
+value distribution of log|ζ(1/2 + it)| against random unitary matrices. A
+simplified Odlyzko-Schönhage evaluator (one nonuniform FFT per window, then
+band-limited interpolation) makes Z cost 2.6 μs per point at any height and
+reproduces Odlyzko's published zeros near the 10¹²th zero to 3e-9.
 
-Animations and a browser version come next.
+A browser version comes next.
 
 ## Install
 
@@ -50,6 +53,12 @@ zeta(np.array([-3, 0.5 + 14.134725141734693j]))   # vectorized: [1/120, ~1e-16]
 from zeta_explorer.spacing import zeros_between, normalized_spacings
 z = zeros_between(10**6, 10**6 + 5)   # zeros between Gram points g_1000000 and g_1000005
 # [600270.74787059, 600271.48637367, 600271.76148043, 600272.00103217, 600273.02653325]
+
+from zeta_explorer.multieval import zeros_fast
+win, u = zeros_fast(10**12 - 2, 10**12 + 4)   # zeros as offsets u from win.t0
+win.t0 - 267653395647 + u
+# [1.62594824, 1.84752313, 2.36236697, 2.68163092, 2.86198994]
+# Odlyzko's table: zero number 10^12 + 1 is at 267653395647 + 1.8475231278
 
 from zeta_explorer.spacing import first_zeros
 from zeta_explorer.explicit import pi_from_zeros, riemann_r
@@ -172,6 +181,22 @@ every point keeps its own N = 10 + ⌊|t|/π⌋, the main sums are one masked
 out of the loop as soon as its Backlund bound is small enough. The whole grid
 takes 1.05 s, against 6.5 s for a Python loop over the old scalar version.
 
+### Landscape and a sweep across the strip
+
+![log |zeta| as a surface over the critical strip](docs/landscape.png)
+
+`plot_landscape()` draws log₁₀|ζ(σ + it)| over −0.5 ≤ σ ≤ 2 and 0 ≤ t ≤ 40,
+clipped to [−1.5, 1]. The pole at s = 1 is the plateau at the back left, and each
+zero is a narrow pit on σ = 1/2. The t grid includes the zeros themselves, so each
+pit reaches the floor.
+
+![zeta(sigma + it) as sigma sweeps from 0.1 to 0.9 and back](docs/sweep.gif)
+
+`sweep_sigma()` moves σ from 0.1 to 0.9 and back as σ = 0.5 + 0.4·sin³(2πk/60),
+so it lingers near the critical line. Off the line the curve winds around the
+origin without touching it and |ζ| stays above 0. At σ = 1/2 both panels touch
+zero at the same six heights.
+
 ### Analytic continuation
 
 ![Partial sums of three series for zeta at the first zero](docs/continuation.png)
@@ -251,6 +276,72 @@ simple. For T = 100,000 it runs in 9 seconds, needs K = 2 blocks, and stops at
 g_138068 ≈ 100000.29 with N = 138,069 (mpmath's `nzeros` agrees). The tests
 cross-check smaller heights the same way.
 
+### Many values of Z at once
+
+![Accuracy and cost of Z from the direct sum and from a NUFFT window](docs/multieval.png)
+
+Every value of Z costs about √(t/2π) terms: 399 at t = 10⁶, 206,393 near the
+10¹²th zero. Odlyzko and Schönhage (1988) noticed that the main sum
+F(t) = Σ n^(−1/2) e^(−it log n) is the same Dirichlet polynomial for every t in a
+window, so its values on an evenly spaced grid can come out of one FFT and
+everything in between can be interpolated. `ZWindow(t_lo, t_hi)` is a simplified
+version of that.
+
+The grid comes first. With a center t₀ and a spacing δ,
+F(t₀ + jδ) = Σ b_n e^(−ij·δ log n) where b_n = n^(−1/2) e^(−it₀ log n). That is a
+type-1 nonuniform FFT: arbitrary frequencies δ log n, integer outputs j. `nufft`
+does it by Gaussian gridding (Dutt-Rokhlin, Greengard-Lee): spread each term onto
+a 2x oversampled grid with a periodic Gaussian, run one FFT, and divide out the
+Gaussian's Fourier coefficients e^(−τk²). With w grid points on each side and
+τ = πw/(3m²), aliasing costs e^(−2πw/3) and cutting the Gaussian off costs
+e^(−3πw/4), both relative to Σ|b_n|, so w = 15 is enough for 1e-13. The tests
+compare it with the direct sum at three sizes and three tolerances.
+
+Then interpolation. Multiplied by e^(iβt) with β = ½ log N, F has its spectrum in
+[−β, β]. The grid samples at δ = π/α with α = 2β, twice the Nyquist rate. A sinc
+of bandwidth α times a Gaussian e^(−ε²u²/2) rebuilds F from the K nearest samples
+on each side. Two errors compete: the Gaussian smears the sinc's spectrum, which
+lets in e^(−(α − β)²/2ε²) from the aliased copies, and stopping the sum at
+distance L = Kδ loses e^(−ε²L²/2). Choosing ε² = (α − β)/L makes both
+e^(−(α − β)L/2) = e^(−πK/4), so K = 36 gives 1e-12, and every Z(t) costs 73
+multiply-adds whatever t is.
+
+Precision turned out to matter as much as speed. At t = 10¹², t·log n is about
+10¹³ radians, and in doubles that has an absolute error near 10⁻³. That is why the
+direct sum is off by 3.5e-3 up there (left panel). The window only needs
+t₀ log n mod 2π and θ(t₀) once, so those come from mpmath at about 36 digits, and
+everything else works with the offset u = t − t₀:
+
+```
+θ(t₀ + u) − θ(t₀) = (u/2)·log(t₀/2π) + (t/2)·log1p(u/t₀) − u/2 + (Stirling tail difference)
+```
+
+All of those terms are moderate in size. Zeros and Gram points come back as
+offsets too, because a double near 2.7·10¹¹ only resolves 6e-5. N goes up by one
+each time t passes 2πk², so the grid uses the largest N in the window and the
+extra term is subtracted directly for points below the jump.
+
+On this machine, once the window is built, each Z costs 2.6 μs at any height. The
+direct sum costs 7.4 μs at t = 10⁶, 795 μs at 10¹⁰ and 7.7 ms at 10¹². Building the
+window takes 0.25 s at 10¹⁰ and about 1.3 s at 10¹², mostly for the mpmath phases.
+Against mpmath's `siegelz`, the window's error stays between 8e-14 and 3e-13 from
+t = 10⁴ to 10¹², while the direct sum's grows from 1e-11 to 3.5e-3.
+
+The check that convinced me was Odlyzko's published table of zeros number
+10¹² + 1 to 10¹² + 10⁴. `zeros_fast(10**12 - 2, 10**12 + 10**4 + 2)` finds all of
+them in 2.5 s with the same numbering, and the largest difference from his values
+is 2.8e-9 (RMS 7e-10; his file promises 1e-8).
+
+Up there Gram blocks start breaking Rosser's rule. The block
+[g_(10¹²+13452), g_(10¹²+13454)) has no zeros at all: Z reaches 98 inside it, and
+its two zeros sit in the previous block, which is a single Gram interval holding
+three. The block finder now deals with that. When a block still comes up short
+after sampling it 1024 times more finely, it is merged with the block before it,
+then with the blocks after it, until the union has as many sign changes as Gram
+intervals. In 100,000 Gram intervals from n = 10¹² that happened 4 times; from
+n = 10⁹, never. 20.1% of the Gram points near 10¹² are bad, against 17.5% near
+10⁹.
+
 ### Zero spacings and random matrices
 
 ![Spacing histogram and pair correlation of 100,000 zeros near t = 5 million](docs/spacing.png)
@@ -283,19 +374,24 @@ samples 300 random 120×120 GUE matrices: the KS distance between their bulk
 spacings and the sine-kernel CDF is 0.0044, against 0.28 for Poisson.
 
 The zeros fit GUE well, but not perfectly, and the gap shrinks with height. For
-100,000 consecutive zeros starting at three heights:
+100,000 consecutive zeros starting at five heights (the last two from
+`zeros_fast`, which takes 11 s for the n = 10⁷ row against 18 s for
+`zeros_between`, and gives the same numbers; at 10⁹ and 10¹² the range between
+the outermost good Gram points holds 99,997 and 99,998 zeros):
 
 | first zero | t range | spacing variance | KS distance to GUE | R₂ − Montgomery, 0.3 < u < 0.9 |
 |---|---|---|---|---|
 | n = 10⁵ | 74,924 to 139,503 | 0.1636 | 0.0174 | −0.012 |
 | n = 10⁶ | 600,271 to 654,852 | 0.1668 | 0.0138 | −0.013 |
 | n = 10⁷ | 4,992,382 to 5,038,615 | 0.1693 | 0.0110 | −0.013 |
+| n = 10⁹ | 371,870,206 to 371,905,313 | 0.1725 | 0.0081 | −0.010 |
+| n = 10¹² | 267,653,395,649 to 267,653,421,320 | 0.1763 | 0.0045 | −0.007 |
 | GUE | | 0.1800 | 0 | 0 |
 
 The zeros are more regular than GUE at these heights: smaller variance, a taller
 peak in the histogram, and slightly fewer close pairs. The variance and the KS
-distance move toward GUE as t grows; the dip in the pair correlation barely moves
-over this range. This is the finite-height
+distance move toward GUE as t grows. The dip in the pair correlation barely moves
+up to 10⁷, then halves by 10¹². This is the finite-height
 effect Bogomolny, Keating and coauthors explained by matching the zeros at height
 t to unitary matrices of effective size log(t/2π)/√(12Λ), where Λ ≈ 1.573, which is
 only about 3 at t = 5·10⁶. It decays like 1/log² t, so it is still visible in
