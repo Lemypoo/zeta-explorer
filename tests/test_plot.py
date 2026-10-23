@@ -14,6 +14,7 @@ from zeta_explorer.plot import (
     plot_landscape,
     plot_lehmer,
     plot_log_z,
+    plot_multieval,
     plot_rs_error,
     plot_spacing,
     plot_spiral,
@@ -111,3 +112,10 @@ def test_sweep_sigma_writes_every_frame(tmp_path):
     anim.save(tmp_path / "sweep.gif", writer=PillowWriter(fps=6), dpi=40)
     assert Image.open(tmp_path / "sweep.gif").n_frames == 8
 
+
+def test_plot_multieval_window_beats_direct_sum():
+    fig = plot_multieval(heights=(1e4, 1e8), points=2)
+    left = fig.axes[0]
+    direct, window = (line.get_ydata() for line in left.lines)
+    assert np.all(window < 1e-11)
+    assert direct[-1] > 1e-9

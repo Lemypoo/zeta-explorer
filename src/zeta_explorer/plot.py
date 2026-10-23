@@ -3,10 +3,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 from zeta_explorer.continuation import dirichlet_sums, em_sums, eta_sums
 from zeta_explorer.explicit import chebyshev_psi, pi_from_zeros, prime_pi, psi_from_zeros, riemann_r
 from zeta_explorer.gram import good_gram, z_values
+from zeta_explorer.multieval import ZWindow
 from zeta_explorer.riemann_siegel import theta, z_exact, z_rs
 from zeta_explorer.spacing import (
     first_zeros,
@@ -464,6 +466,50 @@ def sweep_sigma(
         return spiral, modulus, title
 
     return FuncAnimation(fig, draw, frames=frames, interval=80, blit=False)
+
+
+def plot_multieval(heights: ArrayLike = (1e4, 1e6, 1e8, 1e10, 1e12), points: int = 4) -> Figure:
+    import time
+
+    import matplotlib.pyplot as plt
+    import mpmath
+
+    heights = np.asarray(heights, dtype=float)
+    err_direct, err_window, us_direct, us_window = [], [], [], []
+    for T in heights:
+        win = ZWindow(T, T + 100)
+        u = np.linspace(win.u_lo, win.u_hi, points + 2)[1:-1]
+        with mpmath.workdps(35):
+            exact = np.array([float(mpmath.siegelz(mpmath.mpf(win.t0) + mpmath.mpf(x)))
+                              for x in u])
+        err_direct.append(np.abs(z_rs(win.t0 + u) - exact).max())
+        err_window.append(np.abs(win.z(u) - exact).max())
+        dense = np.linspace(win.u_lo, win.u_hi, 20_000)
+        start = time.perf_counter()
+        win.z(dense)
+        us_window.append((time.perf_counter() - start) / len(dense) * 1e6)
+        few = dense[:200]
+        start = time.perf_counter()
+        z_rs(win.t0 + few)
+        us_direct.append((time.perf_counter() - start) / len(few) * 1e6)
+
+    fig, (left, right) = plt.subplots(1, 2, figsize=(11, 4.4), facecolor=SURFACE)
+    for ax, direct, window, label in (
+        (left, err_direct, err_window, "max |Z − mpmath|"),
+        (right, us_direct, us_window, "μs per point"),
+    ):
+        ax.set_facecolor(SURFACE)
+        ax.loglog(heights, direct, "o-", color=ORDINAL[1], linewidth=2, label="direct sum")
+        ax.loglog(heights, window, "o-", color=ACCENT, linewidth=2, label="NUFFT window")
+        _style(ax)
+        ax.set_xlabel("t", color=INK)
+        ax.set_ylabel(label, color=INK)
+    left.set_title("Accuracy against mpmath", color=INK, fontsize=11, loc="left")
+    right.set_title("Cost per evaluation after the window is built", color=INK, fontsize=11,
+                    loc="left")
+    left.legend(frameon=False, fontsize=9, labelcolor=INK_SECONDARY, loc="upper left")
+    fig.tight_layout()
+    return fig
 
 
 def _style(ax) -> None:
