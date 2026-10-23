@@ -71,6 +71,7 @@ def illinois_many(
     fb: np.ndarray,
     rtol: float = 1e-12,
     max_iter: int = 100,
+    atol: float = 0.0,
 ) -> np.ndarray:
     a, b, fa, fb = (np.array(x, dtype=float) for x in (a, b, fa, fb))
     if np.any(fa * fb > 0):
@@ -87,7 +88,7 @@ def illinois_many(
         a = np.where(flip, b, a)
         fa = np.where(flip, fb, fa / 2)
         b, fb = c, fc
-        done = (fc == 0) | (np.abs(b - a) < rtol * np.abs(b))
+        done = (fc == 0) | (np.abs(b - a) < np.maximum(atol, rtol * np.abs(b)))
         root[idx[done]] = b[done]
         live = ~done
         idx, a, b, fa, fb = idx[live], a[live], b[live], fa[live], fb[live]

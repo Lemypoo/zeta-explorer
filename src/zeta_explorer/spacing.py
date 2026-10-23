@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import functools
 import math
+from collections.abc import Callable
 
 import numpy as np
 from numpy.polynomial import Chebyshev
@@ -15,28 +16,64 @@ S_MAX = 6.0
 
 
 def zeros_between(n_lo: int, n_hi: int, rtol: float = 1e-12, max_level: int = 10) -> np.ndarray:
-    ns = np.arange(n_lo, n_hi + 1)
-    g = gram_points(ns)
+    g = gram_points(np.arange(n_lo, n_hi + 1))
     if g[0] < RS_FROM:
         raise ValueError(f"zeros_between works above t = {RS_FROM:g}")
-    z = z_values(g)
-    good = np.flatnonzero(good_gram(z, n0=n_lo))
-    lo, hi, f_lo, f_hi = [], [], [], []
-    for j, k in zip(good[:-1], good[1:], strict=True):
-        ts, zs = g[j : k + 1], z[j : k + 1]
-        level = 0
-        while (change := np.signbit(zs[1:]) != np.signbit(zs[:-1])).sum() < k - j:
-            level += 1
-            if level > max_level:
-                raise RuntimeError(f"Gram block [{n_lo + j}, {n_lo + k}) breaks Rosser's rule")
-            ts = np.linspace(g[j], g[k], (k - j) * 2**level + 1)
-            zs = np.concatenate(([z[j]], z_values(ts[1:-1]), [z[k]]))
-        lo.append(ts[:-1][change])
-        hi.append(ts[1:][change])
-        f_lo.append(zs[:-1][change])
-        f_hi.append(zs[1:][change])
-    a, b, fa, fb = (np.concatenate(x) for x in (lo, hi, f_lo, f_hi))
-    return illinois_many(z_rs, a, b, fa, fb, rtol)
+    return gram_block_zeros(g, n_lo, z_values, z_rs, rtol=rtol, max_level=max_level)
+
+
+def gram_block_zeros(
+    g: np.ndarray,
+    n0: int,
+    sample: Callable[[np.ndarray], np.ndarray],
+    refine: Callable[[np.ndarray], np.ndarray],
+    rtol: float = 1e-12,
+    atol: float = 0.0,
+    max_level: int = 10,
+    max_merge: int = 4,
+) -> np.ndarray:
+    z = sample(g)
+    good = np.flatnonzero(good_gram(z, n0=n0))
+    blocks = list(zip(good[:-1].tolist(), good[1:].tolist(), strict=True))
+    spans: list[tuple[int, int, tuple[np.ndarray, ...]]] = []
+    i = 0
+    while i < len(blocks):
+        j, k = blocks[i]
+        found = _bracket_changes(g, z, j, k, sample, max_level)
+        if found is None and spans:
+            j = spans.pop()[0]
+            found = _bracket_changes(g, z, j, k, sample, max_level)
+        merged = 0
+        while found is None and merged < max_merge and i + 1 < len(blocks):
+            i += 1
+            merged += 1
+            k = blocks[i][1]
+            found = _bracket_changes(g, z, j, k, sample, max_level)
+        if found is None:
+            raise RuntimeError(f"Gram blocks in [{n0 + j}, {n0 + k}) are missing zeros")
+        spans.append((j, k, found))
+        i += 1
+    a, b, fa, fb = (np.concatenate(x) for x in zip(*(f for _, _, f in spans), strict=True))
+    return illinois_many(refine, a, b, fa, fb, rtol, atol=atol)
+
+
+def _bracket_changes(
+    g: np.ndarray,
+    z: np.ndarray,
+    j: int,
+    k: int,
+    sample: Callable[[np.ndarray], np.ndarray],
+    max_level: int,
+) -> tuple[np.ndarray, ...] | None:
+    ts, zs = g[j : k + 1], z[j : k + 1]
+    level = 0
+    while (change := np.signbit(zs[1:]) != np.signbit(zs[:-1])).sum() < k - j:
+        level += 1
+        if level > max_level:
+            return None
+        ts = np.linspace(g[j], g[k], (k - j) * 2**level + 1)
+        zs = np.concatenate(([z[j]], sample(ts[1:-1]), [z[k]]))
+    return ts[:-1][change], ts[1:][change], zs[:-1][change], zs[1:][change]
 
 
 @functools.cache

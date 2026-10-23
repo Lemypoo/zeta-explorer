@@ -7,6 +7,7 @@ import pytest
 from zeta_explorer.spacing import (
     first_zeros,
     gap_probability,
+    gram_block_zeros,
     gue_spacing,
     gue_spacing_cdf,
     ks_distance,
@@ -136,6 +137,25 @@ def test_unfolded_zeros_have_unit_mean_spacing():
     assert gaps.mean() == pytest.approx(1, abs=1e-3)
     assert ks_distance(gaps, gue_spacing_cdf) < 0.05
     assert ks_distance(gaps, lambda x: 1 - np.exp(-x)) > 0.25
+
+
+def _rosser_counterexample(t, extra):
+    out = np.cos(PI * t) - 2 * np.exp(-8 * (t - 2) ** 2)
+    return out + 2 * np.exp(-200 * (t - 0.7) ** 2) if extra else out
+
+
+def test_gram_blocks_borrow_zeros_from_the_previous_block():
+    f = lambda t: _rosser_counterexample(t, extra=True)  # noqa: E731
+    z = gram_block_zeros(np.arange(4.0), 0, f, f)
+    assert len(z) == 3
+    assert np.all((z > 0) & (z < 1))
+    assert np.abs(f(z)).max() < 1e-12
+
+
+def test_gram_blocks_missing_zeros_raise():
+    f = lambda t: _rosser_counterexample(t, extra=False)  # noqa: E731
+    with pytest.raises(RuntimeError):
+        gram_block_zeros(np.arange(4.0), 0, f, f)
 
 
 def test_zeros_between_rejects_low_heights():
