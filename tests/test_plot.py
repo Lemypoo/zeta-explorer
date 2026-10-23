@@ -1,3 +1,5 @@
+import math
+
 import matplotlib
 import numpy as np
 
@@ -5,13 +7,17 @@ from zeta_explorer.plot import (
     phase_colors,
     plot_continuation,
     plot_domain,
+    plot_explicit,
     plot_gram,
+    plot_lehmer,
+    plot_log_z,
     plot_rs_error,
     plot_spacing,
     plot_spiral,
     plot_z,
 )
-from zeta_explorer.spacing import zeros_between
+from zeta_explorer.spacing import first_zeros, zeros_between
+from zeta_explorer.values import log_z_sample
 
 matplotlib.use("Agg")
 
@@ -65,3 +71,26 @@ def test_plot_spacing():
     fig = plot_spacing(zeros_between(1000, 1400), bins=20)
     assert len(fig.axes) == 2
     assert "399 zero spacings" in fig.axes[0].get_legend().get_texts()[0].get_text()
+
+
+def test_plot_explicit_draws_each_truncation():
+    fig = plot_explicit(first_zeros(20), counts=(5, 10, 20), x_max=30, samples=100)
+    left, right = fig.axes
+    labels = [line.get_label() for line in left.lines]
+    assert labels[-3:] == ["5 zeros", "10 zeros", "20 zeros"]
+    assert len(right.lines) == 4
+
+
+def test_plot_lehmer_marks_the_pair():
+    fig = plot_lehmer(samples=200)
+    zoom = fig.axes[1]
+    assert "0.0377 apart" in zoom.get_title(loc="left")
+    assert len(zoom.lines[-1].get_xdata()) == 2
+
+
+def test_plot_log_z():
+    T = 2 * math.pi * math.exp(8)
+    fig = plot_log_z(log_z_sample(T, 2000, np.random.default_rng(1)), T, 8, bins=30)
+    texts = [t.get_text() for t in fig.axes[0].get_legend().get_texts()]
+    assert texts[0].startswith("log|ζ(1/2 + it)|, 2,000 random t")
+    assert "CUE, N = 8" in texts[1]

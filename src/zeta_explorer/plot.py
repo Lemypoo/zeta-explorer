@@ -5,9 +5,11 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from zeta_explorer.continuation import dirichlet_sums, em_sums, eta_sums
+from zeta_explorer.explicit import chebyshev_psi, pi_from_zeros, prime_pi, psi_from_zeros, riemann_r
 from zeta_explorer.gram import good_gram, z_values
 from zeta_explorer.riemann_siegel import theta, z_exact, z_rs
 from zeta_explorer.spacing import (
+    first_zeros,
     gue_spacing,
     montgomery,
     normalized_spacings,
@@ -15,6 +17,7 @@ from zeta_explorer.spacing import (
     unfold,
     wigner_surmise,
 )
+from zeta_explorer.values import cue_cumulants, cue_density, sample_cumulants
 from zeta_explorer.zeros import find_zeros, gram_points
 from zeta_explorer.zeta import zeta
 
@@ -274,6 +277,99 @@ def plot_spacing(gamma: np.ndarray, bins: int = 60) -> Figure:
         f"Zeros {gamma[0]:,.0f} < t < {gamma[-1]:,.0f} against random matrix theory",
         color=INK, fontsize=12, x=0.01, ha="left",
     )
+    fig.tight_layout()
+    return fig
+
+
+def plot_explicit(
+    gamma: np.ndarray, counts: tuple[int, ...] = (10, 100, 1000), x_max: float = 100.0,
+    samples: int = 3000,
+) -> Figure:
+    import matplotlib.pyplot as plt
+
+    x = np.linspace(2.0, x_max, samples)
+    fig, (left, right) = plt.subplots(1, 2, figsize=(12, 4.8), facecolor=SURFACE)
+    left.step(x, prime_pi(x), where="post", color=INK, linewidth=1.4, label="π(x)")
+    left.plot(x, riemann_r(x), color=INK_SECONDARY, linewidth=1.2, linestyle="--",
+              label="R(x), no zeros")
+    right.step(x, chebyshev_psi(x) - x, where="post", color=INK, linewidth=1.4, label="ψ(x) − x")
+    for K, color in zip(counts, (ORDINAL[0], ORDINAL[2], ACCENT), strict=True):
+        label = f"{K:,} zeros"
+        left.plot(x, pi_from_zeros(x, gamma[:K]), color=color, linewidth=1.2, label=label)
+        right.plot(x, psi_from_zeros(x, gamma[:K]) - x, color=color, linewidth=1.2, label=label)
+    for ax in (left, right):
+        ax.set_facecolor(SURFACE)
+        _style(ax)
+        ax.set_xlim(2, x_max)
+        ax.set_xlabel("x", color=INK)
+    left.set_title("Prime counting function", color=INK, fontsize=11, loc="left")
+    right.set_title("Chebyshev ψ(x) minus its main term", color=INK, fontsize=11, loc="left")
+    left.legend(frameon=False, fontsize=9, labelcolor=INK_SECONDARY, loc="upper left")
+    right.legend(frameon=False, fontsize=9, labelcolor=INK_SECONDARY, loc="lower left", ncol=2)
+    fig.suptitle("Rebuilding the primes from the zeros of ζ (explicit formulas, truncated)",
+                 color=INK, fontsize=12, x=0.01, ha="left")
+    fig.tight_layout()
+    return fig
+
+
+def plot_lehmer(t_min: float = 6995.0, t_max: float = 7015.0, samples: int = 2000) -> Figure:
+    import matplotlib.pyplot as plt
+
+    gamma = first_zeros(6720)[6700:]
+    a, b = gamma[8], gamma[9]
+    pad = 2 * (b - a)
+    t = np.linspace(t_min, t_max, samples)
+    zoom = np.linspace(a - pad, b + pad, samples // 2)
+
+    fig, (left, right) = plt.subplots(1, 2, figsize=(12, 4.6), facecolor=SURFACE,
+                                      gridspec_kw={"width_ratios": [1.6, 1]})
+    origin = round(a)
+    for ax, ts, shift in ((left, t, 0), (right, zoom, origin)):
+        ax.set_facecolor(SURFACE)
+        ax.axhline(0, color=INK_SECONDARY, linewidth=0.8)
+        ax.plot(ts - shift, z_values(ts), color=SERIES, linewidth=2)
+        _style(ax)
+    left.set_xlabel("t", color=INK)
+    right.set_xlabel(f"t − {origin}", color=INK)
+    inside = gamma[(gamma >= t_min) & (gamma <= t_max)]
+    left.plot(inside, np.zeros_like(inside), "o", color=SERIES, markersize=6,
+              markeredgecolor=SURFACE, markeredgewidth=1.5)
+    left.axvspan(a - pad, b + pad, color=ACCENT, alpha=0.15, linewidth=0)
+    left.set_xlim(t_min, t_max)
+    left.set_ylabel("Z(t)", color=INK)
+    left.set_title("Z(t) near t = 7005", color=INK, fontsize=11, loc="left")
+    right.plot([a - origin, b - origin], [0, 0], "o", color=ACCENT, markersize=7,
+               markeredgecolor=SURFACE, markeredgewidth=1.5)
+    right.set_xlim(zoom[0] - origin, zoom[-1] - origin)
+    right.set_title(f"Zeros 6709 and 6710, {b - a:.4f} apart", color=INK, fontsize=11,
+                    loc="left")
+    fig.suptitle("Lehmer's pair: Z barely crosses zero twice", color=INK, fontsize=12, x=0.01,
+                 ha="left")
+    fig.tight_layout()
+    return fig
+
+
+def plot_log_z(sample: np.ndarray, T: float, N: int, bins: int = 120) -> Figure:
+    import matplotlib.pyplot as plt
+
+    x = np.linspace(-8, 5, 600)
+    k = sample_cumulants(sample)
+    selberg = 0.5 * np.log(np.log(T))
+    fig, ax = plt.subplots(figsize=(10, 4.8), facecolor=SURFACE)
+    ax.set_facecolor(SURFACE)
+    ax.hist(sample, bins=bins, range=(-8, 5), density=True, color=ORDINAL[0], edgecolor=SURFACE,
+            linewidth=0.4, label=f"log|ζ(1/2 + it)|, {len(sample):,} random t, variance {k[1]:.3f}")
+    ax.plot(x, cue_density(x, N), color=INK, linewidth=1.8,
+            label=f"CUE, N = {N}, variance {cue_cumulants(N)[1]:.3f}")
+    ax.plot(x, np.exp(-(x**2) / (2 * selberg)) / np.sqrt(2 * np.pi * selberg), color=ACCENT,
+            linewidth=1.4, linestyle="--", label=f"Selberg normal, variance {selberg:.3f}")
+    _style(ax)
+    ax.set_xlim(-8, 5)
+    ax.set_xlabel("log |ζ(1/2 + it)|", color=INK)
+    ax.set_ylabel("density", color=INK)
+    ax.legend(frameon=False, fontsize=9, labelcolor=INK_SECONDARY, loc="upper left")
+    ax.set_title(f"Value distribution near t = {T:.3g} against random unitary matrices",
+                 color=INK, fontsize=12, loc="left")
     fig.tight_layout()
     return fig
 
