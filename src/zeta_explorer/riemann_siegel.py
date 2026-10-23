@@ -16,16 +16,12 @@ def theta(t: ArrayLike) -> float | np.ndarray:
     t = np.asarray(t, dtype=float)
     if np.any(t <= 0):
         raise ValueError("theta's asymptotic series needs t > 0")
-    out = (
-        t / 2 * np.log(t / TWO_PI)
-        - t / 2
-        - math.pi / 8
-        + 1 / (48 * t)
-        + 7 / (5760 * t**3)
-        + 31 / (80640 * t**5)
-        + 127 / (430080 * t**7)
-    )
+    out = t / 2 * np.log(t / TWO_PI) - t / 2 - math.pi / 8 + theta_tail(t)
     return float(out) if out.ndim == 0 else out
+
+
+def theta_tail(t: np.ndarray) -> np.ndarray:
+    return 1 / (48 * t) + 7 / (5760 * t**3) + 31 / (80640 * t**5) + 127 / (430080 * t**7)
 
 
 def theta_prime(t: ArrayLike) -> float | np.ndarray:
@@ -41,17 +37,21 @@ def theta_prime(t: ArrayLike) -> float | np.ndarray:
 
 
 def z_rs(t: ArrayLike, corrections: int = 4) -> float | np.ndarray:
+    ts = np.atleast_1d(np.asarray(t, dtype=float))
+    N = np.sqrt(ts / TWO_PI).astype(np.int64)
+    out = _main_sum(ts, N) + rs_remainder(ts, corrections)
+    return float(out[0]) if np.ndim(t) == 0 else out
+
+
+def rs_remainder(t: np.ndarray, corrections: int = 4) -> np.ndarray:
     coeffs = rs_coefficients()
     if not 0 <= corrections < len(coeffs):
         raise ValueError(f"corrections must be in 0..{len(coeffs) - 1}")
-    ts = np.atleast_1d(np.asarray(t, dtype=float))
-    a = np.sqrt(ts / TWO_PI)
+    a = np.sqrt(t / TWO_PI)
     N = a.astype(np.int64)
     z = a - N - 0.5
     remainder = sum(np.polyval(coeffs[k], z) / a**k for k in range(corrections + 1))
-    sign = np.where(N % 2 == 1, 1.0, -1.0)
-    out = _main_sum(ts, N) + sign / np.sqrt(a) * remainder
-    return float(out[0]) if np.ndim(t) == 0 else out
+    return np.where(N % 2 == 1, 1.0, -1.0) / np.sqrt(a) * remainder
 
 
 def _main_sum(t: np.ndarray, N: np.ndarray) -> np.ndarray:
