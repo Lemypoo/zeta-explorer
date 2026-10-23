@@ -210,12 +210,13 @@ Design notes:
   axis at |z| = 10, and the series loses e^(0.3|w|) digits within π/4 of the
   positive real axis. Rather than paper over that wedge, `ei` raises there. The
   explicit formula only evaluates near the imaginary axis.
-- The Lehmer bound is stated for zeros of H₀, which are 2γ. I first wrote it with
-  γ and got a bound 4 times too small; the 1993 paper's van de Lune numbers
-  (λ ≈ −Δ²/8 in x units) settled the convention. Stopple's paper writes the same
-  definition in γ, which is fine for Δ²g but not for λ.
-- Negative zeros matter at the bottom: for the first pair they are about 4% of g.
-  They are summed exactly over the first 500 zeros.
+- The Lehmer bound is stated for zeros of H₀, which are 2γ. Plugging γ straight
+  into the formula gives −1.78e-4 for Lehmer's pair instead of −7.11e-4. The
+  1993 paper's van de Lune numbers (λ ≈ −Δ²/8 in x units) settled the
+  convention. Stopple's paper writes the definition in γ, which is fine for Δ²g
+  but not for λ.
+- Negative zeros matter at the bottom: for the first pair they are 14% of g
+  (0.0229 of 0.1644). They are summed exactly over the first 500 zeros.
 - The zeta variance sits 0.07 to 0.10 below CUE at every height. That's
   presumably the arithmetic factor from small primes, which I haven't derived, so
   the README just reports it.
