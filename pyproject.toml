@@ -5,12 +5,12 @@ build-backend = "hatchling.build"
 [project]
 name = "zeta-explorer"
 version = "0.1.0"
-description = "Explore the Riemann zeta function: Riemann-Siegel Z with C0 to C4, zeta(s) from scratch, Gram blocks and Turing verification of zeros."
+description = "Explore the Riemann zeta function from scratch: Riemann-Siegel Z, zeta(s), Gram blocks, Turing verification, the explicit formula for pi(x), Lehmer pairs and value distributions."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 authors = [{ name = "Louis Belot" }]
-keywords = ["riemann-zeta", "riemann-hypothesis", "number-theory", "visualization", "riemann-siegel"]
+keywords = ["riemann-zeta", "riemann-hypothesis", "number-theory", "visualization", "riemann-siegel", "explicit-formula", "random-matrix-theory"]
 dependencies = [
     "numpy>=1.24",
     "mpmath>=1.3",
